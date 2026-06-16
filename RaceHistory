@@ -1,0 +1,27 @@
+{
+  "name": "RaceHistory",
+  "type": "object",
+  "properties": {
+    "jogador_id": {
+      "type": "string",
+      "description": "ID do jogador"
+    },
+    "jogador_nome": {
+      "type": "string",
+      "description": "Nome do jogador"
+    },
+    "distancia_percorrida": {
+      "type": "number",
+      "description": "Dist\u00e2ncia percorrida em metros"
+    },
+    "moedas_coletadas": {
+      "type": "number",
+      "description": "Moedas coletadas na corrida"
+    }
+  },
+  "required": [
+    "jogador_id",
+    "distancia_percorrida",
+    "moedas_coletadas"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "name": "Player",
+  "type": "object",
+  "properties": {
+    "nome_usuario": {
+      "type": "string",
+      "description": "Nome do jogador"
+    },
+    "moedas_acumuladas": {
+      "type": "number",
+      "default": 0,
+      "description": "Moedas acumuladas nas corridas"
+    },
+    "recorde_distancia": {
+      "type": "number",
+      "default": 0,
+      "description": "Maior dist\u00e2ncia percorrida em metros"
+    },
+    "moto_atual_id": {
+      "type": "string",
+      "description": "ID da moto equipada atualmente"
+    },
+    "motos_possuidas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Lista de IDs de motos compradas"
+    }
+  },
+  "required": [
+    "nome_usuario"
+  ]
+}

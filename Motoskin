@@ -1,0 +1,31 @@
+{
+  "name": "MotoSkin",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da moto, ex: CG 160, Twister 300"
+    },
+    "preco_moedas": {
+      "type": "number",
+      "description": "Pre\u00e7o em moedas"
+    },
+    "imagem_url": {
+      "type": "string",
+      "description": "URL da imagem da moto"
+    },
+    "velocidade_bonus": {
+      "type": "number",
+      "default": 0,
+      "description": "Bonus de velocidade da moto"
+    },
+    "cor": {
+      "type": "string",
+      "description": "Cor tema da moto em hex"
+    }
+  },
+  "required": [
+    "nome",
+    "preco_moedas"
+  ]
+}
