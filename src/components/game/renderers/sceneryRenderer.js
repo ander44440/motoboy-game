@@ -68,7 +68,7 @@ export function drawScenery(
   }
 
   // Prédios laterais
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < s.buildings.length; i++) {
     const side = i % 2 === 0 ? -1.6 : 3.6;
 
     const y =
@@ -91,8 +91,10 @@ export function drawScenery(
       building.scale * 1.8
     );
 
-    const w = 50 + (i % 3) * 20;
-    const h = 100 + (i % 4) * 40;
+    const buildingData = s.buildings[i];
+
+const w = buildingData.width;
+const h = buildingData.height;
 
     ctx.fillStyle = '#1f2937';
 
@@ -106,18 +108,7 @@ export function drawScenery(
     // Janelas
     ctx.fillStyle = '#fef08a';
 
-    for (let row = 0; row < h / 20; row++) {
-      for (let col = 0; col < w / 15; col++) {
-        if (Math.random() > 0.4) {
-          ctx.fillRect(
-            -w / 2 + 8 + col * 15,
-            -h + 10 + row * 18,
-            5,
-            8
-          );
-        }
-      }
-    }
+    
 
     ctx.restore();
   }
