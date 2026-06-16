@@ -14,9 +14,11 @@ export function drawScenery(
     if (type === 1) velocity = 1.1;
     if (type === 2) velocity = 0.7;
 
+    const cycleSize = CANVAS_HEIGHT + 600;
+
     const offset =
-      ((s.frameCount * s.speed * velocity) + i * 140) %
-      (CANVAS_HEIGHT + 300);
+      ((s.frameCount * s.speed * velocity) + i * 180) %
+      cycleSize - 250;
 
     const obj = projectRoadPoint(side, offset);
 
@@ -71,20 +73,19 @@ export function drawScenery(
   for (let i = 0; i < s.buildings.length; i++) {
     const side = i % 2 === 0 ? -1.6 : 3.6;
 
+    const cycleSize = CANVAS_HEIGHT + 700;
+
     const y =
       (
         (s.frameCount * s.speed * 0.18) +
-        i * 280
-      ) % (CANVAS_HEIGHT + 500);
+        i * 320
+      ) % cycleSize - 350;
 
     const building = projectRoadPoint(side, y);
 
     ctx.save();
 
-    ctx.translate(
-      building.x,
-      building.y
-    );
+    ctx.translate(building.x, building.y);
 
     ctx.scale(
       building.scale * 1.8,
@@ -93,8 +94,8 @@ export function drawScenery(
 
     const buildingData = s.buildings[i];
 
-const w = buildingData.width;
-const h = buildingData.height;
+    const w = buildingData.width;
+    const h = buildingData.height;
 
     ctx.fillStyle = '#1f2937';
 
@@ -108,7 +109,18 @@ const h = buildingData.height;
     // Janelas
     ctx.fillStyle = '#fef08a';
 
-    
+    if (Array.isArray(buildingData.windows)) {
+      buildingData.windows.forEach((window) => {
+        if (!window.lit) return;
+
+        ctx.fillRect(
+          -w / 2 + 8 + window.col * 15,
+          -h + 10 + window.row * 18,
+          5,
+          8
+        );
+      });
+    }
 
     ctx.restore();
   }

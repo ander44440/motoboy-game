@@ -1,16 +1,12 @@
-import { projectRoadPoint }
-from './systems/projectionSystem';
+import { projectRoadPoint } from './systems/projectionSystem';
+import { generateBuildings } from './systems/buildingSystem';
+import { drawPlayer } from './renderers/playerRenderer';
+//import {
+ // generateSceneryObjects,
+  //updateSceneryObjects,
+//}from './systems/scenerySystem';
 
-import { generateBuildings }
-from './systems/buildingSystem';
-
-import { drawPlayer }
-from './renderers/playerRenderer';
-
-import {
-  drawStar,
-  drawCoin,
-} from './renderers/collectibleRenderer';
+import {  drawStar,  drawCoin, } from './renderers/collectibleRenderer';
 
 import { drawVehicle } from './renderers/vehicleRenderer';
 
@@ -21,20 +17,9 @@ import { drawScenery } from './renderers/sceneryRenderer';
 import { drawRoad } from './renderers/roadRenderer';
 
 import React, { useRef, useEffect, useCallback } from 'react';
-import {
-  playCoinSound,
-  playStarSound,
-  playGameOverSound,
-  playLaneChangeSound,
-  resumeAudioContext,
-} from '@/lib/soundEffects';
+import { playCoinSound, playStarSound, playGameOverSound, playLaneChangeSound, resumeAudioContext,} from '@/lib/soundEffects';
 
-import {
-  LANE_COUNT,
-  CANVAS_WIDTH,
-  CANVAS_HEIGHT,
-  STAR_TIERS,
-} from './constants/gameConstants';
+import { LANE_COUNT, CANVAS_WIDTH, CANVAS_HEIGHT, STAR_TIERS, } from './constants/gameConstants';
 
 export default function GameCanvas({
   onScoreUpdate,
@@ -75,6 +60,7 @@ export default function GameCanvas({
       frameCount: 0,
       gameOver: false,
       buildings: generateBuildings(),
+      //sceneryObjects: generateSceneryObjects(),
     };
   }, [getLaneX]);
 
@@ -467,6 +453,11 @@ lane,
         }
       }
 
+      //updateSceneryObjects(
+      //s.sceneryObjects,
+      //s.speed,
+      //CANVAS_HEIGHT
+      //);
       onScoreUpdate(s.score, s.coinsCollected);
       drawGame(ctx, s, motoColor);
 
