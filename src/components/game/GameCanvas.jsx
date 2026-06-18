@@ -311,31 +311,28 @@ drawPlayer(
       });
 
       // Spawn obstacles
-      if (s.frameCount % Math.max(30, 60 - Math.floor(s.speed * 2)) === 0) {
-        const lane = Math.floor(Math.random() * LANE_COUNT);
+if (s.frameCount % Math.max(30, 60 - Math.floor(s.speed * 2)) === 0) {
+  const lane = Math.floor(Math.random() * LANE_COUNT);
 
-// Faixas 0 e 1 = mesmo sentido
-// Faixas 2 e 3 = sentido contrário
-const direction = lane < 2 ? 'away' : 'toward';
+  // Faixas 0 e 1 = mesmo sentido
+  // Faixas 2 e 3 = sentido contrário
+  const direction = lane < 2 ? 'away' : 'toward';
 
-s.obstacles.push({
-  x: getLaneX(lane),
-  y:
-    direction === 'away'
-      ? 0
-      : CANVAS_HEIGHT + 80,
-  lane,
-  direction,
-  type: 'car',
-  color:
-    carColors[
-      Math.floor(
-        Math.random() * carColors.length
-      )
-    ],
-});
-
-      }
+  s.obstacles.push({
+    x: getLaneX(lane),
+    y: 0,
+    lane,
+    direction,
+    type: 'car',
+    color:
+      carColors[
+        Math.floor(
+          Math.random() * carColors.length
+        )
+      ],
+  });
+}
+      
 
       // Spawn regular coins
 if (s.frameCount % 45 === 0) {
@@ -380,25 +377,17 @@ s.coins.push({
         }
       }
 
-      // Move obstacles
+// Move obstacles
 s.obstacles = s.obstacles.filter((o) => {
-  if (o.direction === 'away') {
-    // Mesmo sentido da moto
-    o.y += s.speed;
-    return o.y < CANVAS_HEIGHT + 100;
-  }
-
-  // Sentido contrário
-  o.y -= s.speed * 1.2;
-
-  return o.y > -100;
+  o.y += s.speed;
+  return o.y < CANVAS_HEIGHT + 100;
 });
 
 // Move coins
 s.coins = s.coins.filter((c) => {
   c.y += s.speed;
   return c.y < CANVAS_HEIGHT + 50;
-});
+            });
 
       // Move stars
       s.stars = s.stars.filter((star) => {
