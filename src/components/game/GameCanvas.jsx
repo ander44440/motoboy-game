@@ -49,7 +49,7 @@ export default function GameCanvas({
       lane: 1,
       targetX: getLaneX(1),
       motoX: getLaneX(1),
-      motoY: CANVAS_HEIGHT - 90,
+      motoY: CANVAS_HEIGHT - 220,
       obstacles: [],
       coins: [],
       stars: [],
@@ -314,23 +314,25 @@ drawPlayer(
       if (s.frameCount % Math.max(30, 60 - Math.floor(s.speed * 2)) === 0) {
         const lane = Math.floor(Math.random() * LANE_COUNT);
 
-        s.obstacles.push({
-x: getLaneX(lane),
-y: 0,
-lane,
-direction:
-  lane <= 1 ? 'toward' : 'away',
-type:
-Math.random() > 0.3
-? 'car'
-: 'cone',
-color:
-carColors[
-Math.floor(
-Math.random() *
-carColors.length
-)
-],
+// Faixas 0 e 1 = mesmo sentido
+// Faixas 2 e 3 = sentido contrário
+const direction = lane < 2 ? 'away' : 'toward';
+
+s.obstacles.push({
+  x: getLaneX(lane),
+  y:
+    direction === 'away'
+      ? 0
+      : CANVAS_HEIGHT + 80,
+  lane,
+  direction,
+  type: 'car',
+  color:
+    carColors[
+      Math.floor(
+        Math.random() * carColors.length
+      )
+    ],
 });
 
       }
@@ -349,9 +351,9 @@ const blocked = s.obstacles.some(
 
 if (!blocked) {
 s.coins.push({
-x: getLaneX(lane),
-y: 0,
-lane,
+  x: getLaneX(lane),
+  y: 0,
+  lane,
 });
 }
 }
@@ -379,16 +381,24 @@ lane,
       }
 
       // Move obstacles
-      s.obstacles = s.obstacles.filter((o) => {
-        o.y += s.speed;
-        return o.y < CANVAS_HEIGHT + 100;
-      });
+s.obstacles = s.obstacles.filter((o) => {
+  if (o.direction === 'away') {
+    // Mesmo sentido da moto
+    o.y += s.speed;
+    return o.y < CANVAS_HEIGHT + 100;
+  }
 
-      // Move coins
-      s.coins = s.coins.filter((c) => {
-        c.y += s.speed;
-        return c.y < CANVAS_HEIGHT + 50;
-      });
+  // Sentido contrário
+  o.y -= s.speed * 1.2;
+
+  return o.y > -100;
+});
+
+// Move coins
+s.coins = s.coins.filter((c) => {
+  c.y += s.speed;
+  return c.y < CANVAS_HEIGHT + 50;
+});
 
       // Move stars
       s.stars = s.stars.filter((star) => {

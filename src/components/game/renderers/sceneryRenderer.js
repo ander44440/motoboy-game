@@ -71,15 +71,15 @@ export function drawScenery(
 
   // Prédios laterais
   for (let i = 0; i < s.buildings.length; i++) {
-    const side = i % 2 === 0 ? -1.6 : 3.6;
+    const side = i % 2 === 0 ? -1.2 : 3.2;
 
     const cycleSize = CANVAS_HEIGHT + 700;
 
     const y =
-      (
-        (s.frameCount * s.speed * 0.18) +
-        i * 320
-      ) % cycleSize - 350;
+  (
+    (s.frameCount * s.speed * 0.18) +
+    i * 320
+  ) % cycleSize;
 
     const building = projectRoadPoint(side, y);
 
@@ -88,9 +88,9 @@ export function drawScenery(
     ctx.translate(building.x, building.y);
 
     ctx.scale(
-      building.scale * 1.8,
-      building.scale * 1.8
-    );
+  building.scale * 2.4,
+  building.scale * 2.4
+);
 
     const buildingData = s.buildings[i];
 
