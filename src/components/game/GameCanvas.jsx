@@ -319,7 +319,7 @@ x: getLaneX(lane),
 y: 0,
 lane,
 direction:
-lane === 0 ? 'toward' : 'away',
+  lane <= 1 ? 'toward' : 'away',
 type:
 Math.random() > 0.3
 ? 'car'
