@@ -5,13 +5,14 @@ import {
 } from '../constants/gameConstants';
 
 export function projectRoadPoint(lanePosition, y) {
-  const horizonY = 40;
+  const horizonY = 155;
 
   const roadBottomLeft = 40;
   const roadBottomRight = CANVAS_WIDTH - 40;
 
-  const roadTopLeft = CANVAS_WIDTH * 0.35;
-  const roadTopRight = CANVAS_WIDTH * 0.65;
+  // topo mais estreito para sensação de estrada longa
+  const roadTopLeft = CANVAS_WIDTH * 0.465;
+  const roadTopRight = CANVAS_WIDTH * 0.535;
 
   const t = Math.max(
     0,
@@ -22,8 +23,7 @@ export function projectRoadPoint(lanePosition, y) {
     )
   );
 
-  const perspective =
-    Math.pow(t, 2.2);
+  const perspective = Math.pow(t, 2.2);
 
   const left =
     roadTopLeft +
@@ -36,8 +36,7 @@ export function projectRoadPoint(lanePosition, y) {
       perspective;
 
   const laneWidth =
-    (right - left) /
-    LANE_COUNT;
+    (right - left) / LANE_COUNT;
 
   const x =
     left +

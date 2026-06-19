@@ -311,28 +311,46 @@ drawPlayer(
       });
 
       // Spawn obstacles
-if (s.frameCount % Math.max(30, 60 - Math.floor(s.speed * 2)) === 0) {
-  const lane = Math.floor(Math.random() * LANE_COUNT);
+if (s.frameCount % Math.max(35, 70 - Math.floor(s.speed * 2)) === 0) {
+  const availableLanes = [];
 
-  // Faixas 0 e 1 = mesmo sentido
-  // Faixas 2 e 3 = sentido contrário
-  const direction = lane < 2 ? 'away' : 'toward';
+  for (let lane = 0; lane < LANE_COUNT; lane++) {
+    const hasRecentCar = s.obstacles.some(
+      (o) =>
+        o.lane === lane &&
+        o.y < 260
+    );
 
-  s.obstacles.push({
-    x: getLaneX(lane),
-    y: 0,
-    lane,
-    direction,
-    type: 'car',
-    color:
-      carColors[
-        Math.floor(
-          Math.random() * carColors.length
-        )
-      ],
-  });
+    if (!hasRecentCar) {
+      availableLanes.push(lane);
+    }
+  }
+
+  if (availableLanes.length > 0) {
+    const lane =
+      availableLanes[
+        Math.floor(Math.random() * availableLanes.length)
+      ];
+
+    // Faixas 0 e 1 = mesmo sentido
+    // Faixas 2 e 3 = sentido contrário visual
+    const direction = lane < 2 ? 'away' : 'toward';
+
+    s.obstacles.push({
+      x: getLaneX(lane),
+      y: 0,
+      lane,
+      direction,
+      type: 'car',
+      color:
+        carColors[
+          Math.floor(
+            Math.random() * carColors.length
+          )
+        ],
+    });
+  }
 }
-      
 
       // Spawn regular coins
 if (s.frameCount % 45 === 0) {

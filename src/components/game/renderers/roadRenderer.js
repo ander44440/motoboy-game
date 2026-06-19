@@ -5,33 +5,48 @@ export function drawRoad(
   CANVAS_HEIGHT,
   LANE_COUNT
 ) {
+  const horizonY = 155;
+
   const roadBottomLeft = 40;
   const roadBottomRight = CANVAS_WIDTH - 40;
 
-  const roadTopLeft = CANVAS_WIDTH * 0.35;
-  const roadTopRight = CANVAS_WIDTH * 0.65;
+  // topo mais estreito
+  const roadTopLeft = CANVAS_WIDTH * 0.465;
+  const roadTopRight = CANVAS_WIDTH * 0.535;
 
   // Asfalto
   ctx.fillStyle = '#1a1f2e';
 
   ctx.beginPath();
-  ctx.moveTo(roadTopLeft, 0);
-  ctx.lineTo(roadTopRight, 0);
+  ctx.moveTo(roadTopLeft, horizonY);
+  ctx.lineTo(roadTopRight, horizonY);
   ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
   ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
   ctx.closePath();
   ctx.fill();
 
-  // Textura do asfalto
+  // Textura do asfalto dentro da pista
   ctx.strokeStyle = 'rgba(255,255,255,0.03)';
   ctx.lineWidth = 1;
 
   for (let i = 0; i < 80; i++) {
-    const x =
-      roadBottomLeft +
-      Math.random() * (roadBottomRight - roadBottomLeft);
+    const rawT = Math.random();
 
-    const y = Math.random() * CANVAS_HEIGHT;
+    const y =
+      horizonY +
+      rawT * (CANVAS_HEIGHT - horizonY);
+
+    const left =
+      roadTopLeft +
+      (roadBottomLeft - roadTopLeft) * rawT;
+
+    const right =
+      roadTopRight +
+      (roadBottomRight - roadTopRight) * rawT;
+
+    const x =
+      left +
+      Math.random() * (right - left);
 
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -44,12 +59,12 @@ export function drawRoad(
   ctx.lineWidth = 4;
 
   ctx.beginPath();
-  ctx.moveTo(roadTopLeft, 0);
+  ctx.moveTo(roadTopLeft, horizonY);
   ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(roadTopRight, 0);
+  ctx.moveTo(roadTopRight, horizonY);
   ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
   ctx.stroke();
 
@@ -67,13 +82,17 @@ export function drawRoad(
       ((roadBottomRight - roadBottomLeft) / LANE_COUNT) * i;
 
     s.roadLines.forEach((ly) => {
-      const t = ly / CANVAS_HEIGHT;
+      if (ly < horizonY) return;
+
+      const t =
+        (ly - horizonY) /
+        (CANVAS_HEIGHT - horizonY);
 
       const x =
         topX +
         (bottomX - topX) * t;
 
-      const size = 15 + t * 65;
+      const size = 10 + t * 70;
 
       ctx.beginPath();
       ctx.moveTo(x, ly);
