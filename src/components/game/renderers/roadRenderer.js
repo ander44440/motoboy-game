@@ -5,17 +5,52 @@ export function drawRoad(
   CANVAS_HEIGHT,
   LANE_COUNT
 ) {
-  const horizonY = 155;
+  const horizonY = 152;
 
   const roadBottomLeft = 40;
   const roadBottomRight = CANVAS_WIDTH - 40;
 
-  // topo mais estreito
-  const roadTopLeft = CANVAS_WIDTH * 0.465;
-  const roadTopRight = CANVAS_WIDTH * 0.535;
+  // Mesmo ponto de fuga do projectionSystem
+  const roadTopLeft = CANVAS_WIDTH * 0.462;
+  const roadTopRight = CANVAS_WIDTH * 0.538;
 
-  // Asfalto
-  ctx.fillStyle = '#1a1f2e';
+  // Solo urbano escuro ao redor da pista
+  const groundGradient = ctx.createLinearGradient(
+    0,
+    horizonY,
+    0,
+    CANVAS_HEIGHT
+  );
+
+  groundGradient.addColorStop(0, 'rgba(15, 23, 42, 0.35)');
+  groundGradient.addColorStop(1, 'rgba(15, 23, 42, 0.05)');
+
+  ctx.fillStyle = groundGradient;
+  ctx.fillRect(0, horizonY, CANVAS_WIDTH, CANVAS_HEIGHT - horizonY);
+
+  // Asfalto principal
+  ctx.fillStyle = '#171d2b';
+
+  ctx.beginPath();
+  ctx.moveTo(roadTopLeft, horizonY);
+  ctx.lineTo(roadTopRight, horizonY);
+  ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
+  ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
+  ctx.closePath();
+  ctx.fill();
+
+  // Leve sombra central do asfalto
+  const asphaltShade = ctx.createLinearGradient(
+    0,
+    horizonY,
+    0,
+    CANVAS_HEIGHT
+  );
+
+  asphaltShade.addColorStop(0, 'rgba(255,255,255,0.02)');
+  asphaltShade.addColorStop(1, 'rgba(0,0,0,0.18)');
+
+  ctx.fillStyle = asphaltShade;
 
   ctx.beginPath();
   ctx.moveTo(roadTopLeft, horizonY);
@@ -26,10 +61,10 @@ export function drawRoad(
   ctx.fill();
 
   // Textura do asfalto dentro da pista
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
   ctx.lineWidth = 1;
 
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 90; i++) {
     const rawT = Math.random();
 
     const y =
@@ -54,8 +89,8 @@ export function drawRoad(
     ctx.stroke();
   }
 
-  // Bordas
-  ctx.strokeStyle = '#ffcc00';
+  // Bordas externas amarelas
+  ctx.strokeStyle = '#facc15';
   ctx.lineWidth = 4;
 
   ctx.beginPath();
@@ -68,8 +103,22 @@ export function drawRoad(
   ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
   ctx.stroke();
 
-  // Faixas
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  // Brilho discreto nas bordas
+  ctx.strokeStyle = 'rgba(250, 204, 21, 0.25)';
+  ctx.lineWidth = 8;
+
+  ctx.beginPath();
+  ctx.moveTo(roadTopLeft, horizonY);
+  ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(roadTopRight, horizonY);
+  ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
+  ctx.stroke();
+
+  // Faixas internas
+  ctx.strokeStyle = 'rgba(226,232,240,0.42)';
   ctx.lineWidth = 4;
 
   for (let i = 1; i < LANE_COUNT; i++) {
@@ -92,7 +141,8 @@ export function drawRoad(
         topX +
         (bottomX - topX) * t;
 
-      const size = 10 + t * 70;
+      const size =
+        9 + t * 72;
 
       ctx.beginPath();
       ctx.moveTo(x, ly);
