@@ -1,12 +1,8 @@
 import { projectRoadPoint } from './systems/projectionSystem';
 import { generateBuildings } from './systems/buildingSystem';
 import { drawPlayer } from './renderers/playerRenderer';
-//import {
- // generateSceneryObjects,
-  //updateSceneryObjects,
-//}from './systems/scenerySystem';
 
-import {  drawStar,  drawCoin, } from './renderers/collectibleRenderer';
+import { drawStar, drawCoin } from './renderers/collectibleRenderer';
 
 import { drawVehicle } from './renderers/vehicleRenderer';
 
@@ -17,9 +13,21 @@ import { drawScenery } from './renderers/sceneryRenderer';
 import { drawRoad } from './renderers/roadRenderer';
 
 import React, { useRef, useEffect, useCallback } from 'react';
-import { playCoinSound, playStarSound, playGameOverSound, playLaneChangeSound, resumeAudioContext,} from '@/lib/soundEffects';
 
-import { LANE_COUNT, CANVAS_WIDTH, CANVAS_HEIGHT, STAR_TIERS, } from './constants/gameConstants';
+import {
+  playCoinSound,
+  playStarSound,
+  playGameOverSound,
+  playLaneChangeSound,
+  resumeAudioContext,
+} from '@/lib/soundEffects';
+
+import {
+  LANE_COUNT,
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  STAR_TIERS,
+} from './constants/gameConstants';
 
 export default function GameCanvas({
   onScoreUpdate,
@@ -37,12 +45,8 @@ export default function GameCanvas({
     const roadBottomRight = CANVAS_WIDTH - 40;
     const laneWidth = (roadBottomRight - roadBottomLeft) / LANE_COUNT;
 
-    
     return roadBottomLeft + laneWidth * lane + laneWidth / 2;
   }, []);
-
- 
-
 
   const initState = useCallback(() => {
     return {
@@ -60,7 +64,11 @@ export default function GameCanvas({
       frameCount: 0,
       gameOver: false,
       buildings: generateBuildings(),
-      //sceneryObjects: generateSceneryObjects(),
+
+      // Controle do tráfego urbano
+      nextVehicleSpawnFrame: 42,
+      lastVehicleLane: null,
+      vehicleSpawnCount: 0,
     };
   }, [getLaneX]);
 
@@ -112,158 +120,121 @@ export default function GameCanvas({
     [handleInput]
   );
 
-  
+  const drawGame = useCallback((ctx, s, color) => {
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  const drawGame = useCallback(
-    (ctx, s, color) => {
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    drawBackground(ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      drawBackground(
-  ctx,
-  CANVAS_WIDTH,
-  CANVAS_HEIGHT
-);
+    drawRoad(ctx, s, CANVAS_WIDTH, CANVAS_HEIGHT, LANE_COUNT);
 
-      drawRoad(
-  ctx,
-  s,
-  CANVAS_WIDTH,
-  CANVAS_HEIGHT,
-  LANE_COUNT
-);
-      
+    const drawObstacle = (obs) => {
+      const projected = projectRoadPoint(obs.lane, obs.y);
 
-      const drawObstacle = (obs) => {
-  const projected = projectRoadPoint(obs.lane, obs.y);
+      ctx.save();
+      ctx.translate(projected.x, projected.y);
+      ctx.scale(projected.scale, projected.scale);
 
-  ctx.save();
-  ctx.translate(projected.x, projected.y);
-  ctx.scale(projected.scale, projected.scale);
+      drawVehicle(ctx, obs);
 
-  drawVehicle(ctx, obs);
+      ctx.restore();
+    };
 
-  ctx.restore();
-};
+    const drawCoinProjected = (coin) => {
+      const projected = projectRoadPoint(coin.lane, coin.y);
 
-      const drawCoinProjected = (coin) => {
-  const projected = projectRoadPoint(coin.lane, coin.y);
+      ctx.save();
+      ctx.translate(projected.x, projected.y);
+      ctx.scale(projected.scale, projected.scale);
 
-  ctx.save();
-  ctx.translate(projected.x, projected.y);
-  ctx.scale(projected.scale, projected.scale);
+      drawCoin(ctx);
 
-  drawCoin(ctx);
+      ctx.restore();
+    };
 
-  ctx.restore();
-};
-      const drawBonusStar = (star) => {
-        const projected = projectRoadPoint(star.lane, star.y);
+    const drawBonusStar = (star) => {
+      const projected = projectRoadPoint(star.lane, star.y);
 
-        ctx.save();
-        ctx.translate(projected.x, projected.y);
-        ctx.scale(projected.scale, projected.scale);
+      ctx.save();
+      ctx.translate(projected.x, projected.y);
+      ctx.scale(projected.scale, projected.scale);
 
-        drawStar(ctx, 0, 0, star.tier, s.frameCount * 0.1);
+      drawStar(ctx, 0, 0, star.tier, s.frameCount * 0.1);
 
-        ctx.restore();
-      };
+      ctx.restore();
+    };
 
-      drawScenery(
-  ctx,
-  s,
-  projectRoadPoint,
-  CANVAS_HEIGHT
-);
+    drawScenery(ctx, s, projectRoadPoint, CANVAS_HEIGHT);
 
+    // Prédios laterais
+    for (let i = 0; i < 8; i++) {
+      const side = i % 2 === 0 ? -1.6 : 3.6;
 
-// Prédios laterais
+      const y =
+        ((s.frameCount * s.speed * 0.18) + i * 280) %
+        (CANVAS_HEIGHT + 500);
 
-for (let i = 0; i < 8; i++) {
+      const building = projectRoadPoint(side, y);
 
-  const side = i % 2 === 0 ? -1.6 : 3.6;
+      ctx.save();
 
-  const y =
-(
-  (s.frameCount * s.speed * 0.18)
-  + i * 280
-) % (CANVAS_HEIGHT + 500);
+      ctx.translate(building.x, building.y);
 
-  const building = projectRoadPoint(
-    side,
-    y
-  );
+      ctx.scale(building.scale * 1.8, building.scale * 1.8);
 
-  ctx.save();
+      const w = 50 + (i % 3) * 20;
+      const h = 100 + (i % 4) * 40;
 
-  ctx.translate(
-    building.x,
-    building.y
-  );
+      ctx.fillStyle = '#1f2937';
 
-  ctx.scale(
-    building.scale * 1.8,
-    building.scale * 1.8
-  );
+      ctx.fillRect(-w / 2, -h, w, h);
 
-  const w = 50 + (i % 3) * 20;
-  const h = 100 + (i % 4) * 40;
+      // Janelas
+      ctx.fillStyle = '#fef08a';
 
-  ctx.fillStyle = '#1f2937';
-
-  ctx.fillRect(
-    -w / 2,
-    -h,
-    w,
-    h
-  );
-
-  // janelas
-
-  ctx.fillStyle = '#fef08a';
-
-  for (let row = 0; row < h / 20; row++) {
-
-    for (let col = 0; col < w / 15; col++) {
-
-      if (Math.random() > 0.4) {
-
-        ctx.fillRect(
-          -w / 2 + 8 + col * 15,
-          -h + 10 + row * 18,
-          5,
-          8
-        );
-
+      for (let row = 0; row < h / 20; row++) {
+        for (let col = 0; col < w / 15; col++) {
+          if (Math.random() > 0.4) {
+            ctx.fillRect(
+              -w / 2 + 8 + col * 15,
+              -h + 10 + row * 18,
+              5,
+              8
+            );
+          }
+        }
       }
+
+      ctx.restore();
     }
-  }
 
-  ctx.restore();
-}
-      const renderItems = [
-        ...s.obstacles.map((item) => ({ type: 'obstacle', item, y: item.y })),
-        ...s.coins.map((item) => ({ type: 'coin', item, y: item.y })),
-        ...s.stars.map((item) => ({ type: 'star', item, y: item.y })),
-      ].sort((a, b) => a.y - b.y);
+    const renderItems = [
+      ...s.obstacles.map((item) => ({
+        type: 'obstacle',
+        item,
+        y: item.y,
+      })),
+      ...s.coins.map((item) => ({
+        type: 'coin',
+        item,
+        y: item.y,
+      })),
+      ...s.stars.map((item) => ({
+        type: 'star',
+        item,
+        y: item.y,
+      })),
+    ].sort((a, b) => a.y - b.y);
 
-      renderItems.forEach((entry) => {
-        if (entry.type === 'obstacle') drawObstacle(entry.item);
-        if (entry.type === 'coin') drawCoinProjected(entry.item);
-        if (entry.type === 'star') drawBonusStar(entry.item);
-      });
+    renderItems.forEach((entry) => {
+      if (entry.type === 'obstacle') drawObstacle(entry.item);
+      if (entry.type === 'coin') drawCoinProjected(entry.item);
+      if (entry.type === 'star') drawBonusStar(entry.item);
+    });
 
-     // Moto
+    // Moto
+    drawPlayer(ctx, s.motoX, s.motoY, s.targetX, color || '#22c55e');
+  }, []);
 
-drawPlayer(
-  ctx,
-  s.motoX,
-  s.motoY,
-  s.targetX,
-  color || '#22c55e'
-);
-},
-[projectRoadPoint]
-);
   useEffect(() => {
     if (gameState !== 'playing') return;
 
@@ -276,14 +247,38 @@ drawPlayer(
     stateRef.current = initState();
     const s = stateRef.current;
 
-    const carColors = [
-      '#ef4444',
-      '#3b82f6',
-      '#8b5cf6',
-      '#f59e0b',
-      '#ffffff',
-      '#6b7280',
+    const vehicleColors = [
+      '#ef4444', // vermelho urbano
+      '#2563eb', // azul
+      '#f59e0b', // amarelo/ocre
+      '#e5e7eb', // prata claro
+      '#6b7280', // cinza
+      '#111827', // preto
+      '#16a34a', // verde escuro
+      '#7c3aed', // roxo discreto
     ];
+
+    const vehicleModels = [
+      'compact',
+      'sedan',
+      'suv',
+      'pickup',
+      'compact',
+      'sedan',
+      'van',
+      'suv',
+    ];
+
+    const chooseVehicleColor = () => {
+      return vehicleColors[
+        Math.floor(Math.random() * vehicleColors.length)
+      ];
+    };
+
+    const chooseVehicleModel = () => {
+      const index = s.vehicleSpawnCount % vehicleModels.length;
+      return vehicleModels[index];
+    };
 
     const loop = () => {
       if (s.gameOver) return;
@@ -292,16 +287,12 @@ drawPlayer(
       s.speed = 4;
       s.score = Math.floor(s.frameCount / 4);
 
-      // Smooth lane transition
+      // Transição suave entre faixas
       s.motoX += (s.targetX - s.motoX) * 0.15;
 
-
-     
-
-
-      // Road lines
+      // Linhas da estrada
       s.roadLines = s.roadLines.map((y) => {
-       y += s.speed * 1.35;
+        y += s.speed * 1.35;
 
         if (y > CANVAS_HEIGHT) {
           y -= CANVAS_HEIGHT + 100;
@@ -310,71 +301,76 @@ drawPlayer(
         return y;
       });
 
-      // Spawn obstacles
-if (s.frameCount % Math.max(35, 70 - Math.floor(s.speed * 2)) === 0) {
-  const availableLanes = [];
+      // Spawn de tráfego urbano
+      if (s.frameCount >= s.nextVehicleSpawnFrame) {
+        const availableLanes = [];
 
-  for (let lane = 0; lane < LANE_COUNT; lane++) {
-    const hasRecentCar = s.obstacles.some(
-      (o) =>
-        o.lane === lane &&
-        o.y < 260
-    );
+        for (let lane = 0; lane < LANE_COUNT; lane++) {
+          const hasRecentCar = s.obstacles.some(
+            (o) => o.lane === lane && o.y < 280
+          );
 
-    if (!hasRecentCar) {
-      availableLanes.push(lane);
-    }
-  }
+          if (!hasRecentCar) {
+            availableLanes.push(lane);
+          }
+        }
 
-  if (availableLanes.length > 0) {
-    const lane =
-      availableLanes[
-        Math.floor(Math.random() * availableLanes.length)
-      ];
+        if (availableLanes.length > 0) {
+          const lanesWithoutLast = availableLanes.filter(
+            (lane) => lane !== s.lastVehicleLane
+          );
 
-    // Faixas 0 e 1 = mesmo sentido
-    // Faixas 2 e 3 = sentido contrário visual
-    const direction = lane < 2 ? 'away' : 'toward';
+          const lanePool =
+            lanesWithoutLast.length > 0 ? lanesWithoutLast : availableLanes;
 
-    s.obstacles.push({
-      x: getLaneX(lane),
-      y: 0,
-      lane,
-      direction,
-      type: 'car',
-      color:
-        carColors[
-          Math.floor(
-            Math.random() * carColors.length
-          )
-        ],
-    });
-  }
-}
+          const lane =
+            lanePool[Math.floor(Math.random() * lanePool.length)];
 
-      // Spawn regular coins
-if (s.frameCount % 45 === 0) {
+          // Faixas 0 e 1 = mesmo sentido
+          // Faixas 2 e 3 = sentido contrário visual
+          const direction = lane < 2 ? 'away' : 'toward';
 
-const lane =
-Math.floor(
-Math.random() * LANE_COUNT
-);
+          s.obstacles.push({
+            x: getLaneX(lane),
+            y: 0,
+            lane,
+            direction,
+            type: 'car',
+            vehicleModel: chooseVehicleModel(),
+            color: chooseVehicleColor(),
+          });
 
-const blocked = s.obstacles.some(
-(o) => o.lane === lane && o.y < 160
-);
+          s.lastVehicleLane = lane;
+          s.vehicleSpawnCount++;
 
-if (!blocked) {
-s.coins.push({
-  x: getLaneX(lane),
-  y: 0,
-  lane,
-});
-}
-}
+          // Tráfego mais presente, sem virar parede de carros.
+          s.nextVehicleSpawnFrame =
+            s.frameCount + 38 + Math.floor(Math.random() * 18);
+        } else {
+          // Se todas as faixas estiverem ocupadas perto do horizonte,
+          // tenta novamente logo depois sem forçar spawn injusto.
+          s.nextVehicleSpawnFrame = s.frameCount + 12;
+        }
+      }
 
+      // Spawn de moedas
+      if (s.frameCount % 45 === 0) {
+        const lane = Math.floor(Math.random() * LANE_COUNT);
 
-      // Spawn stars
+        const blocked = s.obstacles.some(
+          (o) => o.lane === lane && o.y < 160
+        );
+
+        if (!blocked) {
+          s.coins.push({
+            x: getLaneX(lane),
+            y: 0,
+            lane,
+          });
+        }
+      }
+
+      // Spawn de estrelas
       if (s.frameCount % 300 === 0) {
         const lane = Math.floor(Math.random() * LANE_COUNT);
 
@@ -395,31 +391,31 @@ s.coins.push({
         }
       }
 
-// Move obstacles
-s.obstacles = s.obstacles.filter((o) => {
-  o.y += s.speed;
-  return o.y < CANVAS_HEIGHT + 100;
-});
+      // Movimento dos obstáculos
+      s.obstacles = s.obstacles.filter((o) => {
+        o.y += s.speed;
+        return o.y < CANVAS_HEIGHT + 100;
+      });
 
-// Move coins
-s.coins = s.coins.filter((c) => {
-  c.y += s.speed;
-  return c.y < CANVAS_HEIGHT + 50;
-            });
+      // Movimento das moedas
+      s.coins = s.coins.filter((c) => {
+        c.y += s.speed;
+        return c.y < CANVAS_HEIGHT + 50;
+      });
 
-      // Move stars
+      // Movimento das estrelas
       s.stars = s.stars.filter((star) => {
         star.y += s.speed;
         return star.y < CANVAS_HEIGHT + 50;
       });
 
-      // Collect coins
+      // Coleta de moedas
       s.coins = s.coins.filter((c) => {
         const projected = projectRoadPoint(c.lane, c.y);
 
         if (
           Math.abs(projected.x - s.motoX) < 30 * projected.scale &&
-          Math.abs(projected.y - s.motoY)< 40 * projected.scale
+          Math.abs(projected.y - s.motoY) < 40 * projected.scale
         ) {
           s.coinsCollected++;
           playCoinSound();
@@ -429,7 +425,7 @@ s.coins = s.coins.filter((c) => {
         return true;
       });
 
-      // Collect stars
+      // Coleta de estrelas
       s.stars = s.stars.filter((star) => {
         const projected = projectRoadPoint(star.lane, star.y);
 
@@ -446,10 +442,12 @@ s.coins = s.coins.filter((c) => {
         return true;
       });
 
-      // Collision detection
+      // Colisão
       for (const obs of s.obstacles) {
         const projected = projectRoadPoint(obs.lane, obs.y);
 
+        // Mantido propositalmente justo:
+        // o desenho ficou mais rico, mas a área de colisão não foi aumentada.
         const hitW =
           obs.type === 'car'
             ? 35 * projected.scale
@@ -462,7 +460,8 @@ s.coins = s.coins.filter((c) => {
 
         if (
           Math.abs(projected.x - s.motoX) < hitW &&
-          Math.abs(projected.y - s.motoY) < hitH        ) {
+          Math.abs(projected.y - s.motoY) < hitH
+        ) {
           s.gameOver = true;
           playGameOverSound();
           onGameOver(s.score, s.coinsCollected);
@@ -470,11 +469,6 @@ s.coins = s.coins.filter((c) => {
         }
       }
 
-      //updateSceneryObjects(
-      //s.sceneryObjects,
-      //s.speed,
-      //CANVAS_HEIGHT
-      //);
       onScoreUpdate(s.score, s.coinsCollected);
       drawGame(ctx, s, motoColor);
 
@@ -496,7 +490,6 @@ s.coins = s.coins.filter((c) => {
     onScoreUpdate,
     onGameOver,
     motoColor,
-    projectRoadPoint,
   ]);
 
   return (
