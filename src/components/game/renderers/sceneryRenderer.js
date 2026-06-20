@@ -1,114 +1,173 @@
-import { CANVAS_WIDTH } from '../constants/gameConstants';
-import { getRoadCurveOffset } from '../systems/projectionSystem';
+import {
+  ROAD_HORIZON_Y,
+  getRoadSlice,
+} from '../systems/projectionSystem';
 
-function getRoadEdgesAtY(y, CANVAS_HEIGHT) {
-  const horizonY = 152;
-
-  const roadBottomLeft = 40;
-  const roadBottomRight = CANVAS_WIDTH - 40;
-
-  const roadTopLeft = CANVAS_WIDTH * 0.462;
-  const roadTopRight = CANVAS_WIDTH * 0.538;
-
-  const t = Math.max(
-    0,
-    Math.min(
-      1,
-      (y - horizonY) /
-        (CANVAS_HEIGHT - horizonY)
-    )
-  );
-
-    const curveOffset = getRoadCurveOffset(y);
-
-  const left =
-    roadTopLeft +
-    (roadBottomLeft - roadTopLeft) * t +
-    curveOffset;
-
-  const right =
-    roadTopRight +
-    (roadBottomRight - roadTopRight) * t +
-    curveOffset;
-
-  return { left, right, t };
+function getSidewalkWidth(t) {
+  return 16 + t * 58;
 }
 
-function drawUrbanSidewalks(ctx, CANVAS_HEIGHT) {
-  const horizonY = 152;
+function drawUrbanSidewalks(
+  ctx,
+  CANVAS_HEIGHT,
+  avenueState
+) {
+  const steps = 28;
 
-  const top = getRoadEdgesAtY(horizonY, CANVAS_HEIGHT);
-  const bottom = getRoadEdgesAtY(CANVAS_HEIGHT, CANVAS_HEIGHT);
+  const leftInner = [];
+  const leftOuter = [];
+  const rightInner = [];
+  const rightOuter = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const progress = i / steps;
+
+    const rawY =
+      ROAD_HORIZON_Y +
+      (CANVAS_HEIGHT - ROAD_HORIZON_Y) *
+        progress;
+
+    const slice = getRoadSlice(
+      rawY,
+      avenueState
+    );
+
+    const width = getSidewalkWidth(slice.t);
+
+    leftInner.push({
+      x: slice.left - 4,
+      y: slice.y,
+    });
+
+    leftOuter.push({
+      x: slice.left - width,
+      y: slice.y,
+    });
+
+    rightInner.push({
+      x: slice.right + 4,
+      y: slice.y,
+    });
+
+    rightOuter.push({
+      x: slice.right + width,
+      y: slice.y,
+    });
+  }
 
   // Calçada esquerda
   ctx.fillStyle = 'rgba(45, 64, 82, 0.75)';
   ctx.beginPath();
-  ctx.moveTo(top.left - 16, horizonY);
-  ctx.lineTo(top.left - 3, horizonY);
-  ctx.lineTo(bottom.left - 7, CANVAS_HEIGHT);
-  ctx.lineTo(bottom.left - 70, CANVAS_HEIGHT);
+
+  ctx.moveTo(leftInner[0].x, leftInner[0].y);
+
+  leftInner.forEach((point) => {
+    ctx.lineTo(point.x, point.y);
+  });
+
+  for (let i = leftOuter.length - 1; i >= 0; i--) {
+    ctx.lineTo(leftOuter[i].x, leftOuter[i].y);
+  }
+
   ctx.closePath();
   ctx.fill();
 
   // Calçada direita
   ctx.beginPath();
-  ctx.moveTo(top.right + 3, horizonY);
-  ctx.lineTo(top.right + 16, horizonY);
-  ctx.lineTo(bottom.right + 70, CANVAS_HEIGHT);
-  ctx.lineTo(bottom.right + 7, CANVAS_HEIGHT);
+
+  ctx.moveTo(rightInner[0].x, rightInner[0].y);
+
+  rightInner.forEach((point) => {
+    ctx.lineTo(point.x, point.y);
+  });
+
+  for (let i = rightOuter.length - 1; i >= 0; i--) {
+    ctx.lineTo(rightOuter[i].x, rightOuter[i].y);
+  }
+
   ctx.closePath();
   ctx.fill();
 
-  // Meio-fio interno esquerdo
+  // Meio-fio esquerdo
   ctx.strokeStyle = 'rgba(203, 213, 225, 0.28)';
   ctx.lineWidth = 2;
 
   ctx.beginPath();
-  ctx.moveTo(top.left - 8, horizonY);
-  ctx.lineTo(bottom.left - 18, CANVAS_HEIGHT);
+
+  leftInner.forEach((point, index) => {
+    if (index === 0) {
+      ctx.moveTo(point.x, point.y);
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  });
+
   ctx.stroke();
 
-  // Meio-fio interno direito
+  // Meio-fio direito
   ctx.beginPath();
-  ctx.moveTo(top.right + 8, horizonY);
-  ctx.lineTo(bottom.right + 18, CANVAS_HEIGHT);
+
+  rightInner.forEach((point, index) => {
+    if (index === 0) {
+      ctx.moveTo(point.x, point.y);
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  });
+
   ctx.stroke();
 
   // Divisões discretas das calçadas
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
   ctx.lineWidth = 1;
 
-  for (let y = horizonY + 60; y < CANVAS_HEIGHT; y += 90) {
-    const edge = getRoadEdgesAtY(y, CANVAS_HEIGHT);
-    const next = getRoadEdgesAtY(y + 28, CANVAS_HEIGHT);
+  for (
+    let rawY = ROAD_HORIZON_Y + 80;
+    rawY < CANVAS_HEIGHT;
+    rawY += 95
+  ) {
+    const slice = getRoadSlice(
+      rawY,
+      avenueState
+    );
+
+    const next = getRoadSlice(
+      rawY + 34,
+      avenueState
+    );
+
+    const width = getSidewalkWidth(slice.t);
+    const nextWidth = getSidewalkWidth(next.t);
 
     ctx.beginPath();
-    ctx.moveTo(edge.left - 18, y);
-    ctx.lineTo(next.left - 42, y + 28);
+    ctx.moveTo(slice.left - 12, slice.y);
+    ctx.lineTo(
+      next.left - nextWidth + 10,
+      next.y
+    );
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(edge.right + 18, y);
-    ctx.lineTo(next.right + 42, y + 28);
+    ctx.moveTo(slice.right + 12, slice.y);
+    ctx.lineTo(
+      next.right + nextWidth - 10,
+      next.y
+    );
     ctx.stroke();
   }
 }
 
 function drawStreetLight(ctx) {
-  // Poste
   ctx.fillStyle = '#64748b';
   ctx.fillRect(-3, -52, 6, 74);
 
-  // Braço
   ctx.fillRect(0, -52, 18, 4);
 
-  // Luminária
   ctx.fillStyle = '#facc15';
   ctx.beginPath();
   ctx.ellipse(21, -50, 7, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Brilho
   ctx.fillStyle = 'rgba(250, 204, 21, 0.18)';
   ctx.beginPath();
   ctx.arc(21, -50, 18, 0, Math.PI * 2);
@@ -158,25 +217,20 @@ function drawUrbanTree(ctx) {
 }
 
 function drawBusStop(ctx) {
-  // Base
   ctx.fillStyle = '#334155';
   ctx.fillRect(-24, 10, 48, 5);
 
-  // Estrutura
   ctx.fillStyle = '#64748b';
   ctx.fillRect(-20, -42, 4, 52);
   ctx.fillRect(16, -42, 4, 52);
   ctx.fillRect(-24, -46, 48, 5);
 
-  // Cobertura
   ctx.fillStyle = '#0f172a';
   ctx.fillRect(-28, -55, 56, 10);
 
-  // Painel
   ctx.fillStyle = 'rgba(96, 165, 250, 0.35)';
   ctx.fillRect(-14, -36, 28, 34);
 
-  // Banco
   ctx.fillStyle = '#475569';
   ctx.fillRect(-16, -2, 32, 5);
 }
@@ -200,109 +254,17 @@ function drawSideObject(ctx, type, index) {
   drawBusStop(ctx);
 }
 
-function drawSideBuildings(
-  ctx,
-  s,
-  projectRoadPoint,
-  CANVAS_HEIGHT
-) {
-  const buildings = Array.isArray(s.buildings)
-    ? s.buildings
-    : [];
-
-  for (let i = 0; i < buildings.length; i++) {
-    const side = i % 2 === 0 ? -1.35 : 3.35;
-
-    const cycleSize = CANVAS_HEIGHT + 760;
-
-    const y =
-      (
-        (s.frameCount * s.speed * 0.16) +
-        i * 340
-      ) % cycleSize;
-
-    const building = projectRoadPoint(side, y);
-    const buildingData = buildings[i];
-
-    if (!buildingData) continue;
-
-    ctx.save();
-
-    ctx.translate(
-      building.x,
-      building.y
-    );
-
-    ctx.scale(
-      building.scale * 2.15,
-      building.scale * 2.15
-    );
-
-    const w = buildingData.width;
-    const h = buildingData.height;
-
-    // Sombra/base
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.fillRect(
-      -w / 2 - 4,
-      -h + 6,
-      w + 8,
-      h
-    );
-
-    // Corpo
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(
-      -w / 2,
-      -h,
-      w,
-      h
-    );
-
-    // Lateral escura
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fillRect(
-      w / 2 - 8,
-      -h,
-      8,
-      h
-    );
-
-    // Topo
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(
-      -w / 2,
-      -h - 5,
-      w,
-      5
-    );
-
-    // Janelas
-    if (Array.isArray(buildingData.windows)) {
-      buildingData.windows.forEach((window) => {
-        if (!window.lit) return;
-
-        ctx.fillStyle = '#fef08a';
-        ctx.fillRect(
-          -w / 2 + 8 + window.col * 15,
-          -h + 10 + window.row * 18,
-          5,
-          8
-        );
-      });
-    }
-
-    ctx.restore();
-  }
-}
-
 export function drawScenery(
   ctx,
   s,
   projectRoadPoint,
   CANVAS_HEIGHT
 ) {
-  drawUrbanSidewalks(ctx, CANVAS_HEIGHT);
+  drawUrbanSidewalks(
+    ctx,
+    CANVAS_HEIGHT,
+    s.avenueState
+  );
 
   // Objetos urbanos laterais
   for (let i = 0; i < 16; i++) {
@@ -324,26 +286,36 @@ export function drawScenery(
         i * 165
       ) % cycleSize - 220;
 
-    const obj = projectRoadPoint(side, offset);
+    const roadSlice = getRoadSlice(
+  offset,
+  s.avenueState
+);
 
-    if (obj.y < 135) continue;
+if (roadSlice.y < 135) continue;
 
-    ctx.save();
+const sidewalkWidth = getSidewalkWidth(
+  roadSlice.t
+);
 
-    ctx.translate(obj.x, obj.y);
-    ctx.scale(obj.scale, obj.scale);
+const sidewalkOffset =
+  sidewalkWidth * 0.62;
 
-    drawSideObject(ctx, type, i);
+const isLeftSide = i % 2 === 0;
 
-    ctx.restore();
-  }
+const objX = isLeftSide
+  ? roadSlice.left - sidewalkOffset
+  : roadSlice.right + sidewalkOffset;
 
-    // Prédios laterais temporariamente desativados.
+ctx.save();
+
+ctx.translate(objX, roadSlice.y);
+ctx.scale(roadSlice.scale, roadSlice.scale);
+
+drawSideObject(ctx, type, i);
+
+ctx.restore();
+
+  // Prédios laterais temporariamente desativados.
   // Vamos recriar a cidade inteira depois, em um pacote único.
-  // drawSideBuildings(
-  //   ctx,
-  //   s,
-  //   projectRoadPoint,
-  //   CANVAS_HEIGHT
-  // );
+}
 }

@@ -1,5 +1,9 @@
-import { projectRoadPoint } from './systems/projectionSystem';
-import { generateBuildings } from './systems/buildingSystem';
+import {
+  projectRoadPoint,
+  projectLaneCenterAtScreenY,
+} 
+
+from './systems/projectionSystem';import { generateBuildings } from './systems/buildingSystem';
 import { drawPlayer } from './renderers/playerRenderer';
 
 import { drawStar, drawCoin } from './renderers/collectibleRenderer';
@@ -41,12 +45,13 @@ export default function GameCanvas({
   const touchStartRef = useRef(null);
 
   const getLaneX = useCallback((lane) => {
-    const roadBottomLeft = 40;
-    const roadBottomRight = CANVAS_WIDTH - 40;
-    const laneWidth = (roadBottomRight - roadBottomLeft) / LANE_COUNT;
+  const motoScreenY = CANVAS_HEIGHT - 220;
 
-    return roadBottomLeft + laneWidth * lane + laneWidth / 2;
-  }, []);
+  return projectLaneCenterAtScreenY(
+    lane,
+    motoScreenY
+  ).x;
+}, []);
 
   const initState = useCallback(() => {
     return {

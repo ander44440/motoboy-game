@@ -1,4 +1,95 @@
-import { getRoadCurveOffset } from '../systems/projectionSystem';
+import {
+  ROAD_HORIZON_Y,
+  getRoadSlice,
+  getRoadBoundaryPoint,
+} from '../systems/projectionSystem';
+
+function pseudoRandom(seed) {
+  const value = Math.sin(seed * 999.91) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function getRoadPathPoints(
+  CANVAS_HEIGHT,
+  avenueState
+) {
+  const points = [];
+  const steps = 34;
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+
+    const y =
+      ROAD_HORIZON_Y +
+      (CANVAS_HEIGHT - ROAD_HORIZON_Y) * t;
+
+    const slice = getRoadSlice(
+      y,
+      avenueState
+    );
+
+    points.push({
+      left: slice.left,
+      right: slice.right,
+      y: slice.y,
+    });
+  }
+
+  return points;
+}
+
+function fillRoadShape(ctx, points) {
+  if (points.length === 0) return;
+
+  ctx.beginPath();
+
+  ctx.moveTo(points[0].left, points[0].y);
+
+  for (let i = 0; i < points.length; i++) {
+    ctx.lineTo(points[i].right, points[i].y);
+  }
+
+  for (let i = points.length - 1; i >= 0; i--) {
+    ctx.lineTo(points[i].left, points[i].y);
+  }
+
+  ctx.closePath();
+  ctx.fill();
+}
+
+function strokeRoadBoundary(
+  ctx,
+  boundaryIndex,
+  CANVAS_HEIGHT,
+  avenueState
+) {
+  const steps = 34;
+
+  ctx.beginPath();
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+
+    const y =
+      ROAD_HORIZON_Y +
+      (CANVAS_HEIGHT - ROAD_HORIZON_Y) * t;
+
+    const point =
+      getRoadBoundaryPoint(
+        boundaryIndex,
+        y,
+        avenueState
+      );
+
+    if (i === 0) {
+      ctx.moveTo(point.x, point.y);
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  }
+
+  ctx.stroke();
+}
 
 export function drawRoad(
   ctx,
@@ -7,42 +98,17 @@ export function drawRoad(
   CANVAS_HEIGHT,
   LANE_COUNT
 ) {
-  const horizonY = 152;
+  const avenueState = s.avenueState;
 
-  const roadBottomLeft = 40;
-  const roadBottomRight = CANVAS_WIDTH - 40;
-
-  // Mesmo ponto de fuga do projectionSystem
-  const roadTopLeft = CANVAS_WIDTH * 0.462;
-  const roadTopRight = CANVAS_WIDTH * 0.538;
-
-  const midY =
-    horizonY + (CANVAS_HEIGHT - horizonY) * 0.48;
-
-  const topOffset = getRoadCurveOffset(horizonY);
-  const midOffset = getRoadCurveOffset(midY);
-  const bottomOffset = getRoadCurveOffset(CANVAS_HEIGHT);
-
-  const curvedTopLeft = roadTopLeft + topOffset;
-  const curvedTopRight = roadTopRight + topOffset;
-
-  const curvedMidLeft =
-    roadTopLeft +
-    (roadBottomLeft - roadTopLeft) * 0.48 +
-    midOffset;
-
-  const curvedMidRight =
-    roadTopRight +
-    (roadBottomRight - roadTopRight) * 0.48 +
-    midOffset;
-
-  const curvedBottomLeft = roadBottomLeft + bottomOffset;
-  const curvedBottomRight = roadBottomRight + bottomOffset;
+  const roadPoints = getRoadPathPoints(
+    CANVAS_HEIGHT,
+    avenueState
+  );
 
   // Solo urbano escuro ao redor da pista
   const groundGradient = ctx.createLinearGradient(
     0,
-    horizonY,
+    ROAD_HORIZON_Y,
     0,
     CANVAS_HEIGHT
   );
@@ -51,34 +117,21 @@ export function drawRoad(
   groundGradient.addColorStop(1, 'rgba(15, 23, 42, 0.05)');
 
   ctx.fillStyle = groundGradient;
-  ctx.fillRect(0, horizonY, CANVAS_WIDTH, CANVAS_HEIGHT - horizonY);
+  ctx.fillRect(
+    0,
+    ROAD_HORIZON_Y,
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT - ROAD_HORIZON_Y
+  );
 
-  // Asfalto principal com curva leve
+  // Asfalto principal
   ctx.fillStyle = '#171d2b';
-
-  ctx.beginPath();
-  ctx.moveTo(curvedTopLeft, horizonY);
-  ctx.lineTo(curvedTopRight, horizonY);
-  ctx.quadraticCurveTo(
-    curvedMidRight,
-    midY,
-    curvedBottomRight,
-    CANVAS_HEIGHT
-  );
-  ctx.lineTo(curvedBottomLeft, CANVAS_HEIGHT);
-  ctx.quadraticCurveTo(
-    curvedMidLeft,
-    midY,
-    curvedTopLeft,
-    horizonY
-  );
-  ctx.closePath();
-  ctx.fill();
+  fillRoadShape(ctx, roadPoints);
 
   // Leve sombra central do asfalto
   const asphaltShade = ctx.createLinearGradient(
     0,
-    horizonY,
+    ROAD_HORIZON_Y,
     0,
     CANVAS_HEIGHT
   );
@@ -87,149 +140,115 @@ export function drawRoad(
   asphaltShade.addColorStop(1, 'rgba(0,0,0,0.18)');
 
   ctx.fillStyle = asphaltShade;
+  fillRoadShape(ctx, roadPoints);
 
-  ctx.beginPath();
-  ctx.moveTo(curvedTopLeft, horizonY);
-  ctx.lineTo(curvedTopRight, horizonY);
-  ctx.quadraticCurveTo(
-    curvedMidRight,
-    midY,
-    curvedBottomRight,
-    CANVAS_HEIGHT
-  );
-  ctx.lineTo(curvedBottomLeft, CANVAS_HEIGHT);
-  ctx.quadraticCurveTo(
-    curvedMidLeft,
-    midY,
-    curvedTopLeft,
-    horizonY
-  );
-  ctx.closePath();
-  ctx.fill();
-
-  // Textura do asfalto dentro da pista
+  // Textura estável do asfalto, sem Math.random no draw
   ctx.strokeStyle = 'rgba(255,255,255,0.025)';
   ctx.lineWidth = 1;
 
-  for (let i = 0; i < 90; i++) {
-    const rawT = Math.random();
+  const textureTravel =
+    s.frameCount * s.speed * 0.45;
 
-    const y =
-      horizonY +
-      rawT * (CANVAS_HEIGHT - horizonY);
+  for (let i = 0; i < 80; i++) {
+    const rawY =
+      ROAD_HORIZON_Y +
+      (
+        (i * 83 + textureTravel) %
+        (CANVAS_HEIGHT - ROAD_HORIZON_Y)
+      );
 
-    const curveOffset = getRoadCurveOffset(y);
-
-    const left =
-      roadTopLeft +
-      (roadBottomLeft - roadTopLeft) * rawT +
-      curveOffset;
-
-    const right =
-      roadTopRight +
-      (roadBottomRight - roadTopRight) * rawT +
-      curveOffset;
+    const slice = getRoadSlice(
+      rawY,
+      avenueState
+    );
 
     const x =
-      left +
-      Math.random() * (right - left);
+      slice.left +
+      pseudoRandom(i + 17) *
+        (slice.right - slice.left);
 
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + 2, y + 2);
+    ctx.moveTo(x, slice.y);
+    ctx.lineTo(
+      x + 2 * slice.scale,
+      slice.y + 2
+    );
     ctx.stroke();
   }
-
-  // Bordas externas amarelas acompanhando a curva
-  ctx.strokeStyle = '#facc15';
-  ctx.lineWidth = 4;
-
-  ctx.beginPath();
-  ctx.moveTo(curvedTopLeft, horizonY);
-  ctx.quadraticCurveTo(
-    curvedMidLeft,
-    midY,
-    curvedBottomLeft,
-    CANVAS_HEIGHT
-  );
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(curvedTopRight, horizonY);
-  ctx.quadraticCurveTo(
-    curvedMidRight,
-    midY,
-    curvedBottomRight,
-    CANVAS_HEIGHT
-  );
-  ctx.stroke();
 
   // Brilho discreto nas bordas
   ctx.strokeStyle = 'rgba(250, 204, 21, 0.25)';
   ctx.lineWidth = 8;
 
-  ctx.beginPath();
-  ctx.moveTo(curvedTopLeft, horizonY);
-  ctx.quadraticCurveTo(
-    curvedMidLeft,
-    midY,
-    curvedBottomLeft,
-    CANVAS_HEIGHT
+  strokeRoadBoundary(
+    ctx,
+    0,
+    CANVAS_HEIGHT,
+    avenueState
   );
-  ctx.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(curvedTopRight, horizonY);
-  ctx.quadraticCurveTo(
-    curvedMidRight,
-    midY,
-    curvedBottomRight,
-    CANVAS_HEIGHT
+  strokeRoadBoundary(
+    ctx,
+    LANE_COUNT,
+    CANVAS_HEIGHT,
+    avenueState
   );
-  ctx.stroke();
 
-  // Faixas internas acompanhando a curva
+  // Bordas externas amarelas acompanhando a projeção real
+  ctx.strokeStyle = '#facc15';
+  ctx.lineWidth = 4;
+
+  strokeRoadBoundary(
+    ctx,
+    0,
+    CANVAS_HEIGHT,
+    avenueState
+  );
+
+  strokeRoadBoundary(
+    ctx,
+    LANE_COUNT,
+    CANVAS_HEIGHT,
+    avenueState
+  );
+
+  // Faixas internas acompanhando a mesma projeção da estrada
   ctx.strokeStyle = 'rgba(226,232,240,0.42)';
   ctx.lineWidth = 4;
 
   for (let i = 1; i < LANE_COUNT; i++) {
-    const topX =
-      roadTopLeft +
-      ((roadTopRight - roadTopLeft) / LANE_COUNT) * i;
-
-    const bottomX =
-      roadBottomLeft +
-      ((roadBottomRight - roadBottomLeft) / LANE_COUNT) * i;
-
     s.roadLines.forEach((ly) => {
-      if (ly < horizonY) return;
+      if (ly < ROAD_HORIZON_Y) return;
+
+      const t =
+        (ly - ROAD_HORIZON_Y) /
+        (CANVAS_HEIGHT - ROAD_HORIZON_Y);
+
+      const dashLength =
+        12 + t * 88;
 
       const y2 = Math.min(
-        ly + 9 + ((ly - horizonY) / (CANVAS_HEIGHT - horizonY)) * 72,
+        ly + dashLength,
         CANVAS_HEIGHT
       );
 
-      const t1 =
-        (ly - horizonY) /
-        (CANVAS_HEIGHT - horizonY);
+      const p1 =
+        getRoadBoundaryPoint(
+          i,
+          ly,
+          avenueState
+        );
 
-      const t2 =
-        (y2 - horizonY) /
-        (CANVAS_HEIGHT - horizonY);
-
-      const x1 =
-        topX +
-        (bottomX - topX) * t1 +
-        getRoadCurveOffset(ly);
-
-      const x2 =
-        topX +
-        (bottomX - topX) * t2 +
-        getRoadCurveOffset(y2);
+      const p2 =
+        getRoadBoundaryPoint(
+          i,
+          y2,
+          avenueState
+        );
 
       ctx.beginPath();
-      ctx.moveTo(x1, ly);
-      ctx.lineTo(x2, y2);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
     });
   }
