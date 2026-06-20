@@ -1,4 +1,5 @@
 import { CANVAS_WIDTH } from '../constants/gameConstants';
+import { getRoadCurveOffset } from '../systems/projectionSystem';
 
 function getRoadEdgesAtY(y, CANVAS_HEIGHT) {
   const horizonY = 152;
@@ -18,13 +19,17 @@ function getRoadEdgesAtY(y, CANVAS_HEIGHT) {
     )
   );
 
+    const curveOffset = getRoadCurveOffset(y);
+
   const left =
     roadTopLeft +
-    (roadBottomLeft - roadTopLeft) * t;
+    (roadBottomLeft - roadTopLeft) * t +
+    curveOffset;
 
   const right =
     roadTopRight +
-    (roadBottomRight - roadTopRight) * t;
+    (roadBottomRight - roadTopRight) * t +
+    curveOffset;
 
   return { left, right, t };
 }
@@ -333,10 +338,12 @@ export function drawScenery(
     ctx.restore();
   }
 
-  drawSideBuildings(
-    ctx,
-    s,
-    projectRoadPoint,
-    CANVAS_HEIGHT
-  );
+    // Prédios laterais temporariamente desativados.
+  // Vamos recriar a cidade inteira depois, em um pacote único.
+  // drawSideBuildings(
+  //   ctx,
+  //   s,
+  //   projectRoadPoint,
+  //   CANVAS_HEIGHT
+  // );
 }

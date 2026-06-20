@@ -1,3 +1,5 @@
+import { getRoadCurveOffset } from '../systems/projectionSystem';
+
 export function drawRoad(
   ctx,
   s,
@@ -14,6 +16,29 @@ export function drawRoad(
   const roadTopLeft = CANVAS_WIDTH * 0.462;
   const roadTopRight = CANVAS_WIDTH * 0.538;
 
+  const midY =
+    horizonY + (CANVAS_HEIGHT - horizonY) * 0.48;
+
+  const topOffset = getRoadCurveOffset(horizonY);
+  const midOffset = getRoadCurveOffset(midY);
+  const bottomOffset = getRoadCurveOffset(CANVAS_HEIGHT);
+
+  const curvedTopLeft = roadTopLeft + topOffset;
+  const curvedTopRight = roadTopRight + topOffset;
+
+  const curvedMidLeft =
+    roadTopLeft +
+    (roadBottomLeft - roadTopLeft) * 0.48 +
+    midOffset;
+
+  const curvedMidRight =
+    roadTopRight +
+    (roadBottomRight - roadTopRight) * 0.48 +
+    midOffset;
+
+  const curvedBottomLeft = roadBottomLeft + bottomOffset;
+  const curvedBottomRight = roadBottomRight + bottomOffset;
+
   // Solo urbano escuro ao redor da pista
   const groundGradient = ctx.createLinearGradient(
     0,
@@ -28,14 +53,25 @@ export function drawRoad(
   ctx.fillStyle = groundGradient;
   ctx.fillRect(0, horizonY, CANVAS_WIDTH, CANVAS_HEIGHT - horizonY);
 
-  // Asfalto principal
+  // Asfalto principal com curva leve
   ctx.fillStyle = '#171d2b';
 
   ctx.beginPath();
-  ctx.moveTo(roadTopLeft, horizonY);
-  ctx.lineTo(roadTopRight, horizonY);
-  ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
-  ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
+  ctx.moveTo(curvedTopLeft, horizonY);
+  ctx.lineTo(curvedTopRight, horizonY);
+  ctx.quadraticCurveTo(
+    curvedMidRight,
+    midY,
+    curvedBottomRight,
+    CANVAS_HEIGHT
+  );
+  ctx.lineTo(curvedBottomLeft, CANVAS_HEIGHT);
+  ctx.quadraticCurveTo(
+    curvedMidLeft,
+    midY,
+    curvedTopLeft,
+    horizonY
+  );
   ctx.closePath();
   ctx.fill();
 
@@ -53,10 +89,21 @@ export function drawRoad(
   ctx.fillStyle = asphaltShade;
 
   ctx.beginPath();
-  ctx.moveTo(roadTopLeft, horizonY);
-  ctx.lineTo(roadTopRight, horizonY);
-  ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
-  ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
+  ctx.moveTo(curvedTopLeft, horizonY);
+  ctx.lineTo(curvedTopRight, horizonY);
+  ctx.quadraticCurveTo(
+    curvedMidRight,
+    midY,
+    curvedBottomRight,
+    CANVAS_HEIGHT
+  );
+  ctx.lineTo(curvedBottomLeft, CANVAS_HEIGHT);
+  ctx.quadraticCurveTo(
+    curvedMidLeft,
+    midY,
+    curvedTopLeft,
+    horizonY
+  );
   ctx.closePath();
   ctx.fill();
 
@@ -71,13 +118,17 @@ export function drawRoad(
       horizonY +
       rawT * (CANVAS_HEIGHT - horizonY);
 
+    const curveOffset = getRoadCurveOffset(y);
+
     const left =
       roadTopLeft +
-      (roadBottomLeft - roadTopLeft) * rawT;
+      (roadBottomLeft - roadTopLeft) * rawT +
+      curveOffset;
 
     const right =
       roadTopRight +
-      (roadBottomRight - roadTopRight) * rawT;
+      (roadBottomRight - roadTopRight) * rawT +
+      curveOffset;
 
     const x =
       left +
@@ -89,18 +140,28 @@ export function drawRoad(
     ctx.stroke();
   }
 
-  // Bordas externas amarelas
+  // Bordas externas amarelas acompanhando a curva
   ctx.strokeStyle = '#facc15';
   ctx.lineWidth = 4;
 
   ctx.beginPath();
-  ctx.moveTo(roadTopLeft, horizonY);
-  ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
+  ctx.moveTo(curvedTopLeft, horizonY);
+  ctx.quadraticCurveTo(
+    curvedMidLeft,
+    midY,
+    curvedBottomLeft,
+    CANVAS_HEIGHT
+  );
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(roadTopRight, horizonY);
-  ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
+  ctx.moveTo(curvedTopRight, horizonY);
+  ctx.quadraticCurveTo(
+    curvedMidRight,
+    midY,
+    curvedBottomRight,
+    CANVAS_HEIGHT
+  );
   ctx.stroke();
 
   // Brilho discreto nas bordas
@@ -108,16 +169,26 @@ export function drawRoad(
   ctx.lineWidth = 8;
 
   ctx.beginPath();
-  ctx.moveTo(roadTopLeft, horizonY);
-  ctx.lineTo(roadBottomLeft, CANVAS_HEIGHT);
+  ctx.moveTo(curvedTopLeft, horizonY);
+  ctx.quadraticCurveTo(
+    curvedMidLeft,
+    midY,
+    curvedBottomLeft,
+    CANVAS_HEIGHT
+  );
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(roadTopRight, horizonY);
-  ctx.lineTo(roadBottomRight, CANVAS_HEIGHT);
+  ctx.moveTo(curvedTopRight, horizonY);
+  ctx.quadraticCurveTo(
+    curvedMidRight,
+    midY,
+    curvedBottomRight,
+    CANVAS_HEIGHT
+  );
   ctx.stroke();
 
-  // Faixas internas
+  // Faixas internas acompanhando a curva
   ctx.strokeStyle = 'rgba(226,232,240,0.42)';
   ctx.lineWidth = 4;
 
@@ -133,20 +204,32 @@ export function drawRoad(
     s.roadLines.forEach((ly) => {
       if (ly < horizonY) return;
 
-      const t =
+      const y2 = Math.min(
+        ly + 9 + ((ly - horizonY) / (CANVAS_HEIGHT - horizonY)) * 72,
+        CANVAS_HEIGHT
+      );
+
+      const t1 =
         (ly - horizonY) /
         (CANVAS_HEIGHT - horizonY);
 
-      const x =
-        topX +
-        (bottomX - topX) * t;
+      const t2 =
+        (y2 - horizonY) /
+        (CANVAS_HEIGHT - horizonY);
 
-      const size =
-        9 + t * 72;
+      const x1 =
+        topX +
+        (bottomX - topX) * t1 +
+        getRoadCurveOffset(ly);
+
+      const x2 =
+        topX +
+        (bottomX - topX) * t2 +
+        getRoadCurveOffset(y2);
 
       ctx.beginPath();
-      ctx.moveTo(x, ly);
-      ctx.lineTo(x, ly + size);
+      ctx.moveTo(x1, ly);
+      ctx.lineTo(x2, y2);
       ctx.stroke();
     });
   }

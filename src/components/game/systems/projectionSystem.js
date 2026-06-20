@@ -4,6 +4,29 @@ import {
   CANVAS_HEIGHT,
 } from '../constants/gameConstants';
 
+export function getRoadCurveOffset(y) {
+  const horizonY = 152;
+
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      (y - horizonY) / (CANVAS_HEIGHT - horizonY)
+    )
+  );
+
+  // Curva leve:
+  // zero no horizonte, aparece no meio da pista,
+  // e volta quase a zero perto da moto.
+  const curveStrength = 16;
+
+  return (
+    Math.sin(t * Math.PI) *
+    Math.pow(1 - t, 0.45) *
+    curveStrength
+  );
+}
+
 export function projectRoadPoint(lanePosition, y) {
   const horizonY = 152;
 
@@ -26,15 +49,19 @@ export function projectRoadPoint(lanePosition, y) {
   const perspective =
     Math.pow(t, 2.2);
 
+  const curveOffset = getRoadCurveOffset(y);
+
   const left =
     roadTopLeft +
     (roadBottomLeft - roadTopLeft) *
-      perspective;
+      perspective +
+    curveOffset;
 
   const right =
     roadTopRight +
     (roadBottomRight - roadTopRight) *
-      perspective;
+      perspective +
+    curveOffset;
 
   const laneWidth =
     (right - left) /

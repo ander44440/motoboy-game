@@ -165,47 +165,7 @@ export default function GameCanvas({
 
     drawScenery(ctx, s, projectRoadPoint, CANVAS_HEIGHT);
 
-    // Prédios laterais
-    for (let i = 0; i < 8; i++) {
-      const side = i % 2 === 0 ? -1.6 : 3.6;
-
-      const y =
-        ((s.frameCount * s.speed * 0.18) + i * 280) %
-        (CANVAS_HEIGHT + 500);
-
-      const building = projectRoadPoint(side, y);
-
-      ctx.save();
-
-      ctx.translate(building.x, building.y);
-
-      ctx.scale(building.scale * 1.8, building.scale * 1.8);
-
-      const w = 50 + (i % 3) * 20;
-      const h = 100 + (i % 4) * 40;
-
-      ctx.fillStyle = '#1f2937';
-
-      ctx.fillRect(-w / 2, -h, w, h);
-
-      // Janelas
-      ctx.fillStyle = '#fef08a';
-
-      for (let row = 0; row < h / 20; row++) {
-        for (let col = 0; col < w / 15; col++) {
-          if (Math.random() > 0.4) {
-            ctx.fillRect(
-              -w / 2 + 8 + col * 15,
-              -h + 10 + row * 18,
-              5,
-              8
-            );
-          }
-        }
-      }
-
-      ctx.restore();
-    }
+  
 
     const renderItems = [
       ...s.obstacles.map((item) => ({
