@@ -9,38 +9,43 @@ export const AVENUE_SEGMENT_TYPES = {
 
 const AVENUE_SEQUENCE = [
   {
+    type: AVENUE_SEGMENT_TYPES.STRAIGHT,
+    length: 500,
+    curve: 0,
+  },
+  {
     type: AVENUE_SEGMENT_TYPES.CURVE_RIGHT,
-    length: 1400,
+    length: 850,
     curve: 1,
   },
   {
     type: AVENUE_SEGMENT_TYPES.STRAIGHT,
-    length: 900,
-    curve: 0,
-  },
-  {
-    type: AVENUE_SEGMENT_TYPES.CURVE_LEFT,
-    length: 1300,
-    curve: -1,
-  },
-  {
-    type: AVENUE_SEGMENT_TYPES.STRAIGHT,
-    length: 900,
+    length: 520,
     curve: 0,
   },
   {
     type: AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH,
-    length: 650,
+    length: 430,
     curve: 0,
   },
   {
     type: AVENUE_SEGMENT_TYPES.INTERSECTION,
-    length: 360,
+    length: 420,
     curve: 0,
   },
   {
     type: AVENUE_SEGMENT_TYPES.INTERSECTION_EXIT,
-    length: 650,
+    length: 520,
+    curve: 0,
+  },
+  {
+    type: AVENUE_SEGMENT_TYPES.CURVE_LEFT,
+    length: 900,
+    curve: -1,
+  },
+  {
+    type: AVENUE_SEGMENT_TYPES.STRAIGHT,
+    length: 700,
     curve: 0,
   },
 ];

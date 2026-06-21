@@ -267,10 +267,15 @@ export default function GameCanvas({
       });
 
       // Spawn de tráfego urbano
-      if (s.frameCount >= s.nextVehicleSpawnFrame) {
+      // Faixa esquerda reservada temporariamente para prints/testes
+const RESERVED_LEFT_LANE = 0;
+
+// Spawn de tráfego urbano
+if (s.frameCount >= s.nextVehicleSpawnFrame) {
         const availableLanes = [];
 
         for (let lane = 0; lane < LANE_COUNT; lane++) {
+  if (lane === RESERVED_LEFT_LANE) continue;
           const hasRecentCar = s.obstacles.some(
             (o) => o.lane === lane && o.y < 280
           );
@@ -320,7 +325,8 @@ export default function GameCanvas({
 
       // Spawn de moedas
       if (s.frameCount % 45 === 0) {
-        const lane = Math.floor(Math.random() * LANE_COUNT);
+        const lane =
+  1 + Math.floor(Math.random() * (LANE_COUNT - 1));
 
         const blocked = s.obstacles.some(
           (o) => o.lane === lane && o.y < 160
