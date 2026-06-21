@@ -28,10 +28,7 @@ function getResolvedAvenueState(s) {
   return getAvenueSegmentState(urbanDistance);
 }
 
-function getRoadPathPoints(
-  CANVAS_HEIGHT,
-  avenueState
-) {
+function getRoadPathPoints(CANVAS_HEIGHT, avenueState) {
   const points = [];
   const steps = 34;
 
@@ -42,10 +39,7 @@ function getRoadPathPoints(
       ROAD_HORIZON_Y +
       (CANVAS_HEIGHT - ROAD_HORIZON_Y) * t;
 
-    const slice = getRoadSlice(
-      y,
-      avenueState
-    );
+    const slice = getRoadSlice(y, avenueState);
 
     points.push({
       left: slice.left,
@@ -93,12 +87,11 @@ function strokeRoadBoundary(
       ROAD_HORIZON_Y +
       (CANVAS_HEIGHT - ROAD_HORIZON_Y) * t;
 
-    const point =
-      getRoadBoundaryPoint(
-        boundaryIndex,
-        y,
-        avenueState
-      );
+    const point = getRoadBoundaryPoint(
+      boundaryIndex,
+      y,
+      avenueState
+    );
 
     if (i === 0) {
       ctx.moveTo(point.x, point.y);
@@ -110,23 +103,17 @@ function strokeRoadBoundary(
   ctx.stroke();
 }
 
-function getIntersectionBand(
-  avenueState,
-  CANVAS_HEIGHT
-) {
+function getIntersectionBand(avenueState, CANVAS_HEIGHT) {
   if (!avenueState) return null;
 
   const type = avenueState.type;
-  const progress = smoothStep(
-    avenueState.progress || 0
-  );
+  const progress = smoothStep(avenueState.progress || 0);
 
   let centerRawY = null;
   let opacity = 1;
 
   if (
-    type ===
-    AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH
+    type === AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH
   ) {
     centerRawY =
       ROAD_HORIZON_Y +
@@ -136,10 +123,7 @@ function getIntersectionBand(
     opacity = 0.5 + progress * 0.35;
   }
 
-  if (
-    type ===
-    AVENUE_SEGMENT_TYPES.INTERSECTION
-  ) {
+  if (type === AVENUE_SEGMENT_TYPES.INTERSECTION) {
     centerRawY =
       ROAD_HORIZON_Y +
       155 +
@@ -149,8 +133,7 @@ function getIntersectionBand(
   }
 
   if (
-    type ===
-    AVENUE_SEGMENT_TYPES.INTERSECTION_EXIT
+    type === AVENUE_SEGMENT_TYPES.INTERSECTION_EXIT
   ) {
     centerRawY =
       ROAD_HORIZON_Y +
@@ -167,8 +150,7 @@ function getIntersectionBand(
     avenueState
   );
 
-  const bandSize =
-    54 + centerSlice.t * 140;
+  const bandSize = 54 + centerSlice.t * 140;
 
   const topRawY = Math.max(
     ROAD_HORIZON_Y,
@@ -188,6 +170,144 @@ function getIntersectionBand(
     bottomRawY,
     opacity,
   };
+}
+
+function getTrafficLightColor(frameCount) {
+  const cycle = frameCount % 260;
+
+  if (cycle < 120) return 'green';
+  if (cycle < 170) return 'yellow';
+  return 'red';
+}
+
+function drawTrafficLightHead(ctx, activeColor) {
+  // Caixa do semáforo
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(-9, -48, 18, 44);
+
+  ctx.strokeStyle = 'rgba(203,213,225,0.32)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-9, -48, 18, 44);
+
+  const lights = [
+    {
+      color: 'red',
+      y: -40,
+      fill: '#dc2626',
+      glow: 'rgba(248,113,113,0.32)',
+    },
+    {
+      color: 'yellow',
+      y: -26,
+      fill: '#facc15',
+      glow: 'rgba(250,204,21,0.28)',
+    },
+    {
+      color: 'green',
+      y: -12,
+      fill: '#22c55e',
+      glow: 'rgba(34,197,94,0.30)',
+    },
+  ];
+
+  lights.forEach((light) => {
+    const isActive = activeColor === light.color;
+
+    if (isActive) {
+      ctx.fillStyle = light.glow;
+      ctx.beginPath();
+      ctx.arc(0, light.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = isActive
+      ? light.fill
+      : 'rgba(30,41,59,0.95)';
+
+    ctx.beginPath();
+    ctx.arc(0, light.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+}
+
+function drawTrafficLightVisual(
+  ctx,
+  s,
+  CANVAS_HEIGHT,
+  avenueState
+) {
+  const band = getIntersectionBand(
+    avenueState,
+    CANVAS_HEIGHT
+  );
+
+  if (!band) return;
+
+  const anchorRawY = Math.max(
+    ROAD_HORIZON_Y + 30,
+    band.topRawY - 12
+  );
+
+  const slice = getRoadSlice(
+    anchorRawY,
+    avenueState
+  );
+
+  if (slice.y < ROAD_HORIZON_Y + 10) return;
+
+  const activeColor = getTrafficLightColor(s.frameCount);
+
+  const opacity = Math.max(
+    0.35,
+    Math.min(1, band.opacity)
+  );
+
+  const scale = 0.42 + slice.t * 0.78;
+
+  // Semáforo do lado direito para manter a faixa esquerda livre
+  const x =
+    slice.right +
+    24 +
+    slice.t * 22;
+
+  const y =
+    slice.y +
+    18 * scale;
+
+  ctx.save();
+
+  ctx.globalAlpha = opacity;
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+
+  // Sombra/base no chão
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(0, 8, 17, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Poste
+  ctx.fillStyle = '#64748b';
+  ctx.fillRect(-2, -58, 4, 68);
+
+  // Braço do semáforo
+  ctx.fillRect(-2, -58, -24, 4);
+
+  // Caixa pendurada no braço
+  ctx.save();
+  ctx.translate(-27, -49);
+  drawTrafficLightHead(ctx, activeColor);
+  ctx.restore();
+
+  // Pequena placa traseira
+  ctx.fillStyle = 'rgba(15,23,42,0.92)';
+  ctx.fillRect(-5, -63, 8, 8);
+
+  ctx.restore();
 }
 
 function drawIntersectionVisual(
@@ -456,27 +576,24 @@ export function drawRoad(
         (ly - ROAD_HORIZON_Y) /
         (CANVAS_HEIGHT - ROAD_HORIZON_Y);
 
-      const dashLength =
-        12 + t * 88;
+      const dashLength = 12 + t * 88;
 
       const y2 = Math.min(
         ly + dashLength,
         CANVAS_HEIGHT
       );
 
-      const p1 =
-        getRoadBoundaryPoint(
-          i,
-          ly,
-          avenueState
-        );
+      const p1 = getRoadBoundaryPoint(
+        i,
+        ly,
+        avenueState
+      );
 
-      const p2 =
-        getRoadBoundaryPoint(
-          i,
-          y2,
-          avenueState
-        );
+      const p2 = getRoadBoundaryPoint(
+        i,
+        y2,
+        avenueState
+      );
 
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
@@ -489,6 +606,14 @@ export function drawRoad(
   drawIntersectionVisual(
     ctx,
     CANVAS_WIDTH,
+    CANVAS_HEIGHT,
+    avenueState
+  );
+
+  // Semáforo visual, ainda sem lógica de parada
+  drawTrafficLightVisual(
+    ctx,
+    s,
     CANVAS_HEIGHT,
     avenueState
   );
