@@ -1,9 +1,24 @@
+import React, {
+  useRef,
+  useEffect,
+  useCallback,
+} from 'react';
+
 import {
   projectRoadPoint,
   projectLaneCenterAtScreenY,
-} 
+  getRoadSourceYForScreenY,
+} from './systems/projectionSystem';
 
-from './systems/projectionSystem';import { generateBuildings } from './systems/buildingSystem';
+import { getTrafficLightState } from './systems/trafficLightSystem';
+
+import {
+  AVENUE_SEGMENT_TYPES,
+  getAvenueSegmentState,
+} from './systems/urbanSegmentSystem';
+
+import { generateBuildings } from './systems/buildingSystem';
+
 import { drawPlayer } from './renderers/playerRenderer';
 
 import { drawStar, drawCoin } from './renderers/collectibleRenderer';
@@ -15,8 +30,6 @@ import { drawBackground } from './renderers/backgroundRenderer';
 import { drawScenery } from './renderers/sceneryRenderer';
 
 import { drawRoad } from './renderers/roadRenderer';
-
-import React, { useRef, useEffect, useCallback } from 'react';
 
 import {
   playCoinSound,
@@ -44,6 +57,89 @@ export default function GameCanvas({
   const stateRef = useRef(null);
   const touchStartRef = useRef(null);
 
+    const getCurrentAvenueState = useCallback((s) => {
+    const urbanDistance =
+      typeof s.urbanDistance === 'number'
+        ? s.urbanDistance
+        : s.frameCount * s.speed;
+
+    return getAvenueSegmentState(urbanDistance);
+  }, []);
+
+  const isTrafficLightZoneActive = useCallback((avenueState) => {
+    if (!avenueState) return false;
+
+    return (
+      avenueState.type ===
+        AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH ||
+      avenueState.type === AVENUE_SEGMENT_TYPES.INTERSECTION
+    );
+  }, []);
+
+    const getVehicleSpeedForTrafficLight = useCallback(
+    (s, vehicle) => {
+      const trafficLightState =
+        s.trafficLightState ||
+        getTrafficLightState(s.frameCount);
+
+      const avenueState = getCurrentAvenueState(s);
+
+      if (!isTrafficLightZoneActive(avenueState)) {
+  return s.speed * 0.86;
+
+      }
+
+      // A linha visual de parada fica perto da primeira linha branca
+      // antes do cruzamento. Como os veículos usam Y lógico,
+      // convertemos o Y da tela para o Y da projeção.
+      const stopLineSourceY =
+        getRoadSourceYForScreenY(356);
+
+      const distanceToStopLine =
+        stopLineSourceY - vehicle.y;
+
+      // Se o veículo já passou da linha, deixa seguir.
+      // Isso evita carro travado no meio do cruzamento.
+      if (vehicle.y > stopLineSourceY + 18) {
+        return s.speed;
+      }
+
+      if (trafficLightState.shouldStop) {
+        // Vermelho: para antes da faixa.
+        if (
+          distanceToStopLine <= 42 &&
+          distanceToStopLine >= -6
+        ) {
+          return 0.86;
+        }
+
+        // Vermelho: aproxima reduzindo.
+        if (
+          distanceToStopLine > 42 &&
+          distanceToStopLine < 165
+        ) {
+          return s.speed * 0.28;
+        }
+      }
+
+      if (trafficLightState.shouldSlowDown) {
+        // Amarelo: reduz, mas não para.
+        if (
+          distanceToStopLine > 28 &&
+          distanceToStopLine < 145
+        ) {
+          return s.speed * 0.62;
+        }
+      }
+
+      return s.speed;
+    },
+    [
+      getCurrentAvenueState,
+      isTrafficLightZoneActive,
+    ]
+  );
+
   const getLaneX = useCallback((lane) => {
   const motoScreenY = CANVAS_HEIGHT - 220;
 
@@ -67,8 +163,9 @@ export default function GameCanvas({
       coinsCollected: 0,
       speed: 4,
       frameCount: 0,
-      gameOver: false,
-      buildings: generateBuildings(),
+trafficLightState: getTrafficLightState(0),
+gameOver: false,
+buildings: generateBuildings(),
 
       // Controle do tráfego urbano
       nextVehicleSpawnFrame: 42,
@@ -249,8 +346,9 @@ export default function GameCanvas({
       if (s.gameOver) return;
 
       s.frameCount++;
-      s.speed = 4;
-      s.score = Math.floor(s.frameCount / 4);
+s.speed = 3;
+s.score = Math.floor(s.frameCount / 4);
+s.trafficLightState = getTrafficLightState(s.frameCount);
 
       // Transição suave entre faixas
       s.motoX += (s.targetX - s.motoX) * 0.15;
@@ -362,9 +460,16 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
         }
       }
 
-      // Movimento dos obstáculos
+            // Movimento dos obstáculos
+      // Agora os veículos começam a reagir ao semáforo.
       s.obstacles = s.obstacles.filter((o) => {
-        o.y += s.speed;
+        const vehicleSpeed =
+          o.type === 'car'
+            ? getVehicleSpeedForTrafficLight(s, o)
+            : s.speed;
+
+        o.y += vehicleSpeed;
+
         return o.y < CANVAS_HEIGHT + 100;
       });
 
@@ -453,11 +558,12 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [
+    }, [
     gameState,
     initState,
     getLaneX,
     drawGame,
+    getVehicleSpeedForTrafficLight,
     onScoreUpdate,
     onGameOver,
     motoColor,

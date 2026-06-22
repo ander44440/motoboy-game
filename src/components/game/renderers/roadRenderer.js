@@ -9,6 +9,8 @@ import {
   getAvenueSegmentState,
 } from '../systems/urbanSegmentSystem';
 
+import { getTrafficLightState } from '../systems/trafficLightSystem';
+
 function pseudoRandom(seed) {
   const value = Math.sin(seed * 999.91) * 43758.5453;
   return value - Math.floor(value);
@@ -173,11 +175,7 @@ function getIntersectionBand(avenueState, CANVAS_HEIGHT) {
 }
 
 function getTrafficLightColor(frameCount) {
-  const cycle = frameCount % 260;
-
-  if (cycle < 120) return 'green';
-  if (cycle < 170) return 'yellow';
-  return 'red';
+  return getTrafficLightState(frameCount).color;
 }
 
 function drawTrafficLightHead(ctx, activeColor) {
