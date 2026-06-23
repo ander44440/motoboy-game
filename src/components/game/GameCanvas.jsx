@@ -46,6 +46,29 @@ import {
   STAR_TIERS,
 } from './constants/gameConstants';
 
+const RESERVED_LEFT_LANE = 0;
+
+// Velocidade urbana ajustada.
+// 3 ficou legível, mas lento demais.
+// 4 era rápido demais para ler o semáforo.
+// 3.75 devolve energia sem perder controle.
+const GAME_SPEED = 6.75;
+
+// A moto pode estar rápida, mas a cidade não precisa avançar
+// no mesmo ritmo. Isso evita cruzamentos passando rápido demais.
+const URBAN_FLOW_MULTIPLIER = 0.52;
+
+// Remove veículos logo antes de grudarem na base visual.
+const VEHICLE_DESPAWN_Y = CANVAS_HEIGHT - 8;
+
+// Coletáveis usam projeção. Por isso a remoção precisa olhar
+// o Y visual projetado, não apenas o Y lógico.
+const COLLECTIBLE_DESPAWN_SCREEN_Y = CANVAS_HEIGHT - 35;
+
+// A fila só precisa existir antes/na região útil do jogo.
+// Depois disso, o objeto deve sair naturalmente.
+const QUEUE_CONTROL_LIMIT_Y = CANVAS_HEIGHT - 180;
+
 export default function GameCanvas({
   onScoreUpdate,
   onGameOver,
@@ -57,7 +80,7 @@ export default function GameCanvas({
   const stateRef = useRef(null);
   const touchStartRef = useRef(null);
 
-    const getCurrentAvenueState = useCallback((s) => {
+  const getCurrentAvenueState = useCallback((s) => {
     const urbanDistance =
       typeof s.urbanDistance === 'number'
         ? s.urbanDistance
@@ -70,14 +93,56 @@ export default function GameCanvas({
     if (!avenueState) return false;
 
     return (
-      avenueState.type ===
-        AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH ||
+      avenueState.type === AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH ||
       avenueState.type === AVENUE_SEGMENT_TYPES.INTERSECTION
     );
   }, []);
 
-    const getVehicleSpeedForTrafficLight = useCallback(
+  const getVehicleQueueSpeedLimit = useCallback((s, vehicle) => {
+    if (vehicle.type !== 'car') return Infinity;
+
+    if (vehicle.y > QUEUE_CONTROL_LIMIT_Y) {
+      return Infinity;
+    }
+
+    const minimumGap = 60;
+    const slowGap = 98;
+
+    let nearestGap = Infinity;
+
+    for (const other of s.obstacles) {
+      if (other === vehicle) continue;
+      if (other.type !== 'car') continue;
+      if (other.lane !== vehicle.lane) continue;
+
+      if (other.y > QUEUE_CONTROL_LIMIT_Y) continue;
+
+      const gap = other.y - vehicle.y;
+
+      if (gap > 0 && gap < nearestGap) {
+        nearestGap = gap;
+      }
+    }
+
+    if (nearestGap === Infinity) {
+      return Infinity;
+    }
+
+    if (nearestGap <= minimumGap) {
+      return 0;
+    }
+
+    if (nearestGap < slowGap) {
+      return Math.max(0, (nearestGap - minimumGap) * 0.09);
+    }
+
+    return Infinity;
+  }, []);
+
+  const getVehicleSpeedForTrafficLight = useCallback(
     (s, vehicle) => {
+      const baseVehicleSpeed = s.speed * 0.92;
+
       const trafficLightState =
         s.trafficLightState ||
         getTrafficLightState(s.frameCount);
@@ -85,54 +150,56 @@ export default function GameCanvas({
       const avenueState = getCurrentAvenueState(s);
 
       if (!isTrafficLightZoneActive(avenueState)) {
-  return s.speed * 0.86;
-
+        return baseVehicleSpeed;
       }
 
-      // A linha visual de parada fica perto da primeira linha branca
-      // antes do cruzamento. Como os veículos usam Y lógico,
-      // convertemos o Y da tela para o Y da projeção.
-      const stopLineSourceY =
-        getRoadSourceYForScreenY(356);
+      const stopLineSourceY = getRoadSourceYForScreenY(356);
 
-      const distanceToStopLine =
-        stopLineSourceY - vehicle.y;
+      const stopBuffer = 18;
+      const redSlowDistance = 150;
+      const yellowSlowDistance = 120;
 
-      // Se o veículo já passou da linha, deixa seguir.
+      const distanceToStopLine = stopLineSourceY - vehicle.y;
+
+      // Se já passou da linha, segue.
       // Isso evita carro travado no meio do cruzamento.
-      if (vehicle.y > stopLineSourceY + 18) {
-        return s.speed;
+      if (distanceToStopLine <= 0) {
+        return baseVehicleSpeed;
       }
 
       if (trafficLightState.shouldStop) {
         // Vermelho: para antes da faixa.
-        if (
-          distanceToStopLine <= 42 &&
-          distanceToStopLine >= -6
-        ) {
-          return 0.86;
+        if (distanceToStopLine <= stopBuffer) {
+          return 0;
         }
 
-        // Vermelho: aproxima reduzindo.
-        if (
-          distanceToStopLine > 42 &&
-          distanceToStopLine < 165
-        ) {
-          return s.speed * 0.28;
+        // Vermelho: aproxima reduzindo sem ultrapassar a linha.
+        if (distanceToStopLine < redSlowDistance) {
+          const approachSpeed =
+            distanceToStopLine < 64
+              ? baseVehicleSpeed * 0.24
+              : baseVehicleSpeed * 0.48;
+
+          const safeSpeed = Math.max(
+            0,
+            distanceToStopLine - stopBuffer
+          );
+
+          return Math.min(approachSpeed, safeSpeed);
         }
       }
 
       if (trafficLightState.shouldSlowDown) {
-        // Amarelo: reduz, mas não para.
+        // Amarelo: reduz, mas não trava.
         if (
-          distanceToStopLine > 28 &&
-          distanceToStopLine < 145
+          distanceToStopLine > stopBuffer &&
+          distanceToStopLine < yellowSlowDistance
         ) {
-          return s.speed * 0.62;
+          return baseVehicleSpeed * 0.74;
         }
       }
 
-      return s.speed;
+      return baseVehicleSpeed;
     },
     [
       getCurrentAvenueState,
@@ -141,13 +208,13 @@ export default function GameCanvas({
   );
 
   const getLaneX = useCallback((lane) => {
-  const motoScreenY = CANVAS_HEIGHT - 220;
+    const motoScreenY = CANVAS_HEIGHT - 220;
 
-  return projectLaneCenterAtScreenY(
-    lane,
-    motoScreenY
-  ).x;
-}, []);
+    return projectLaneCenterAtScreenY(
+      lane,
+      motoScreenY
+    ).x;
+  }, []);
 
   const initState = useCallback(() => {
     return {
@@ -161,13 +228,13 @@ export default function GameCanvas({
       roadLines: [0, 100, 200, 300, 400, 500, 600, 700],
       score: 0,
       coinsCollected: 0,
-      speed: 4,
+      speed: GAME_SPEED,
       frameCount: 0,
-trafficLightState: getTrafficLightState(0),
-gameOver: false,
-buildings: generateBuildings(),
+      urbanDistance: 0,
+      trafficLightState: getTrafficLightState(0),
+      gameOver: false,
+      buildings: generateBuildings(),
 
-      // Controle do tráfego urbano
       nextVehicleSpawnFrame: 42,
       lastVehicleLane: null,
       vehicleSpawnCount: 0,
@@ -267,8 +334,6 @@ buildings: generateBuildings(),
 
     drawScenery(ctx, s, projectRoadPoint, CANVAS_HEIGHT);
 
-  
-
     const renderItems = [
       ...s.obstacles.map((item) => ({
         type: 'obstacle',
@@ -293,7 +358,6 @@ buildings: generateBuildings(),
       if (entry.type === 'star') drawBonusStar(entry.item);
     });
 
-    // Moto
     drawPlayer(ctx, s.motoX, s.motoY, s.targetX, color || '#22c55e');
   }, []);
 
@@ -310,14 +374,14 @@ buildings: generateBuildings(),
     const s = stateRef.current;
 
     const vehicleColors = [
-      '#ef4444', // vermelho urbano
-      '#2563eb', // azul
-      '#f59e0b', // amarelo/ocre
-      '#e5e7eb', // prata claro
-      '#6b7280', // cinza
-      '#111827', // preto
-      '#16a34a', // verde escuro
-      '#7c3aed', // roxo discreto
+      '#ef4444',
+      '#2563eb',
+      '#f59e0b',
+      '#e5e7eb',
+      '#6b7280',
+      '#111827',
+      '#16a34a',
+      '#7c3aed',
     ];
 
     const vehicleModels = [
@@ -346,16 +410,15 @@ buildings: generateBuildings(),
       if (s.gameOver) return;
 
       s.frameCount++;
-s.speed = 3;
-s.score = Math.floor(s.frameCount / 4);
-s.trafficLightState = getTrafficLightState(s.frameCount);
+      s.speed = GAME_SPEED;
+      s.urbanDistance += s.speed * URBAN_FLOW_MULTIPLIER;
+      s.score = Math.floor(s.frameCount / 4);
+      s.trafficLightState = getTrafficLightState(s.frameCount);
 
-      // Transição suave entre faixas
       s.motoX += (s.targetX - s.motoX) * 0.15;
 
-      // Linhas da estrada
       s.roadLines = s.roadLines.map((y) => {
-        y += s.speed * 1.35;
+        y += s.speed * 1.5;
 
         if (y > CANVAS_HEIGHT) {
           y -= CANVAS_HEIGHT + 100;
@@ -364,19 +427,15 @@ s.trafficLightState = getTrafficLightState(s.frameCount);
         return y;
       });
 
-      // Spawn de tráfego urbano
-      // Faixa esquerda reservada temporariamente para prints/testes
-const RESERVED_LEFT_LANE = 0;
-
-// Spawn de tráfego urbano
-if (s.frameCount >= s.nextVehicleSpawnFrame) {
+      if (s.frameCount >= s.nextVehicleSpawnFrame) {
         const availableLanes = [];
 
         for (let lane = 0; lane < LANE_COUNT; lane++) {
-  if (lane === RESERVED_LEFT_LANE) continue;
+          if (lane === RESERVED_LEFT_LANE) continue;
+
           const hasRecentCar = s.obstacles.some(
-            (o) => o.lane === lane && o.y < 280
-          );
+          (o) => o.lane === lane && o.y < 240
+         );
 
           if (!hasRecentCar) {
             availableLanes.push(lane);
@@ -389,13 +448,13 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
           );
 
           const lanePool =
-            lanesWithoutLast.length > 0 ? lanesWithoutLast : availableLanes;
+            lanesWithoutLast.length > 0
+              ? lanesWithoutLast
+              : availableLanes;
 
           const lane =
             lanePool[Math.floor(Math.random() * lanePool.length)];
 
-          // Faixas 0 e 1 = mesmo sentido
-          // Faixas 2 e 3 = sentido contrário visual
           const direction = lane < 2 ? 'away' : 'toward';
 
           s.obstacles.push({
@@ -411,20 +470,16 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
           s.lastVehicleLane = lane;
           s.vehicleSpawnCount++;
 
-          // Tráfego mais presente, sem virar parede de carros.
           s.nextVehicleSpawnFrame =
-            s.frameCount + 38 + Math.floor(Math.random() * 18);
+          s.frameCount + 24 + Math.floor(Math.random() * 14);
         } else {
-          // Se todas as faixas estiverem ocupadas perto do horizonte,
-          // tenta novamente logo depois sem forçar spawn injusto.
-          s.nextVehicleSpawnFrame = s.frameCount + 12;
+          s.nextVehicleSpawnFrame = s.frameCount + 8;
         }
       }
 
-      // Spawn de moedas
-      if (s.frameCount % 45 === 0) {
-        const lane =
-  1 + Math.floor(Math.random() * (LANE_COUNT - 1));
+      // Moedas podem aparecer também na faixa esquerda.
+      if (s.frameCount % 42 === 0) {
+        const lane = Math.floor(Math.random() * LANE_COUNT);
 
         const blocked = s.obstacles.some(
           (o) => o.lane === lane && o.y < 160
@@ -439,7 +494,7 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
         }
       }
 
-      // Spawn de estrelas
+      // Estrelas podem aparecer também na faixa esquerda.
       if (s.frameCount % 300 === 0) {
         const lane = Math.floor(Math.random() * LANE_COUNT);
 
@@ -460,32 +515,40 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
         }
       }
 
-            // Movimento dos obstáculos
-      // Agora os veículos começam a reagir ao semáforo.
       s.obstacles = s.obstacles.filter((o) => {
-        const vehicleSpeed =
+        let vehicleSpeed =
           o.type === 'car'
             ? getVehicleSpeedForTrafficLight(s, o)
             : s.speed;
 
+        if (o.type === 'car') {
+          vehicleSpeed = Math.min(
+            vehicleSpeed,
+            getVehicleQueueSpeedLimit(s, o)
+          );
+        }
+
         o.y += vehicleSpeed;
 
-        return o.y < CANVAS_HEIGHT + 100;
+        return o.y < VEHICLE_DESPAWN_Y;
       });
 
-      // Movimento das moedas
       s.coins = s.coins.filter((c) => {
         c.y += s.speed;
-        return c.y < CANVAS_HEIGHT + 50;
+
+        const projected = projectRoadPoint(c.lane, c.y);
+
+        return projected.y < COLLECTIBLE_DESPAWN_SCREEN_Y;
       });
 
-      // Movimento das estrelas
       s.stars = s.stars.filter((star) => {
         star.y += s.speed;
-        return star.y < CANVAS_HEIGHT + 50;
+
+        const projected = projectRoadPoint(star.lane, star.y);
+
+        return projected.y < COLLECTIBLE_DESPAWN_SCREEN_Y;
       });
 
-      // Coleta de moedas
       s.coins = s.coins.filter((c) => {
         const projected = projectRoadPoint(c.lane, c.y);
 
@@ -501,7 +564,6 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
         return true;
       });
 
-      // Coleta de estrelas
       s.stars = s.stars.filter((star) => {
         const projected = projectRoadPoint(star.lane, star.y);
 
@@ -518,12 +580,9 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
         return true;
       });
 
-      // Colisão
       for (const obs of s.obstacles) {
         const projected = projectRoadPoint(obs.lane, obs.y);
 
-        // Mantido propositalmente justo:
-        // o desenho ficou mais rico, mas a área de colisão não foi aumentada.
         const hitW =
           obs.type === 'car'
             ? 35 * projected.scale
@@ -558,12 +617,13 @@ if (s.frameCount >= s.nextVehicleSpawnFrame) {
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-    }, [
+  }, [
     gameState,
     initState,
     getLaneX,
     drawGame,
     getVehicleSpeedForTrafficLight,
+    getVehicleQueueSpeedLimit,
     onScoreUpdate,
     onGameOver,
     motoColor,
