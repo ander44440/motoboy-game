@@ -57,7 +57,6 @@ function fillRoadShape(ctx, points) {
   if (points.length === 0) return;
 
   ctx.beginPath();
-
   ctx.moveTo(points[0].left, points[0].y);
 
   for (let i = 0; i < points.length; i++) {
@@ -174,12 +173,255 @@ function getIntersectionBand(avenueState, CANVAS_HEIGHT) {
   };
 }
 
+function getStopLineInfo(
+  avenueState,
+  CANVAS_HEIGHT,
+  side = 'near'
+) {
+  const band = getIntersectionBand(
+    avenueState,
+    CANVAS_HEIGHT
+  );
+
+  if (!band) return null;
+
+  const referenceRawY =
+    side === 'near'
+      ? band.bottomRawY
+      : band.topRawY;
+
+  const referenceSlice = getRoadSlice(
+    referenceRawY,
+    avenueState
+  );
+
+  const setback = 16 + referenceSlice.t * 30;
+
+  const rawY =
+    side === 'near'
+      ? Math.min(
+          CANVAS_HEIGHT - 10,
+          band.bottomRawY + setback
+        )
+      : Math.max(
+          ROAD_HORIZON_Y + 10,
+          band.topRawY - setback
+        );
+
+  const slice = getRoadSlice(
+    rawY,
+    avenueState
+  );
+
+  if (slice.y < ROAD_HORIZON_Y + 8) return null;
+  if (slice.y > CANVAS_HEIGHT - 6) return null;
+
+  return {
+    rawY,
+    slice,
+    opacity: band.opacity,
+    side,
+  };
+}
+
+function drawStopLine(
+  ctx,
+  CANVAS_HEIGHT,
+  avenueState,
+  side,
+  opacityMultiplier = 1
+) {
+  const stopLine = getStopLineInfo(
+    avenueState,
+    CANVAS_HEIGHT,
+    side
+  );
+
+  if (!stopLine) return;
+
+  const slice = stopLine.slice;
+  const opacity = Math.max(
+    0,
+    Math.min(
+      1,
+      stopLine.opacity * opacityMultiplier
+    )
+  );
+
+  if (opacity <= 0.02) return;
+
+  const inset = 13 + slice.t * 14;
+  const y = slice.y;
+  const left = slice.left + inset;
+  const right = slice.right - inset;
+
+  const width = right - left;
+  if (width <= 20) return;
+
+  const thickness = 3.5 + slice.t * 5.5;
+
+  ctx.save();
+
+  ctx.lineCap = 'round';
+
+  ctx.strokeStyle = `rgba(0,0,0,${0.30 * opacity})`;
+  ctx.lineWidth = thickness + 4;
+
+  ctx.beginPath();
+  ctx.moveTo(left, y + 2);
+  ctx.lineTo(right, y + 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(248,250,252,${0.96 * opacity})`;
+  ctx.lineWidth = thickness;
+
+  ctx.beginPath();
+  ctx.moveTo(left, y);
+  ctx.lineTo(right, y);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(23,29,43,${0.20 * opacity})`;
+  ctx.lineWidth = Math.max(1, thickness * 0.32);
+
+  for (let i = 0; i < 5; i++) {
+    const x =
+      left +
+      width * (0.18 + i * 0.16);
+
+    ctx.beginPath();
+    ctx.moveTo(x - 4 * slice.scale, y);
+    ctx.lineTo(x + 5 * slice.scale, y);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawCrosswalk(
+  ctx,
+  CANVAS_HEIGHT,
+  avenueState,
+  side,
+  opacityMultiplier = 1
+) {
+  const band = getIntersectionBand(
+    avenueState,
+    CANVAS_HEIGHT
+  );
+
+  if (!band) return;
+
+  const stopLine = getStopLineInfo(
+    avenueState,
+    CANVAS_HEIGHT,
+    side
+  );
+
+  if (!stopLine) return;
+
+  let topRawY;
+  let bottomRawY;
+
+  if (side === 'near') {
+    topRawY = band.bottomRawY + 6;
+    bottomRawY = stopLine.rawY - 12;
+  } else {
+    topRawY = stopLine.rawY + 12;
+    bottomRawY = band.topRawY - 6;
+  }
+
+  if (bottomRawY <= topRawY + 6) return;
+
+  const opacity = Math.max(
+    0,
+    Math.min(
+      1,
+      stopLine.opacity * opacityMultiplier
+    )
+  );
+
+  if (opacity <= 0.02) return;
+
+  const topSlice = getRoadSlice(
+    topRawY,
+    avenueState
+  );
+
+  const bottomSlice = getRoadSlice(
+    bottomRawY,
+    avenueState
+  );
+
+  if (topSlice.y < ROAD_HORIZON_Y + 6) return;
+  if (bottomSlice.y > CANVAS_HEIGHT - 6) return;
+
+  const stripeCount = side === 'near' ? 6 : 5;
+
+  const topInset = 18 + topSlice.t * 16;
+  const bottomInset = 18 + bottomSlice.t * 16;
+
+  const topLeft = topSlice.left + topInset;
+  const topRight = topSlice.right - topInset;
+
+  const bottomLeft = bottomSlice.left + bottomInset;
+  const bottomRight = bottomSlice.right - bottomInset;
+
+  const gap = 0.055;
+  const stripeWidth = 0.065;
+
+  ctx.save();
+
+  for (let i = 0; i < stripeCount; i++) {
+    const center =
+      0.18 +
+      i * ((0.64) / Math.max(1, stripeCount - 1));
+
+    const a = center - stripeWidth / 2;
+    const b = center + stripeWidth / 2;
+
+    if (a < gap || b > 1 - gap) continue;
+
+    const x1Top =
+      topLeft + (topRight - topLeft) * a;
+    const x2Top =
+      topLeft + (topRight - topLeft) * b;
+
+    const x1Bottom =
+      bottomLeft + (bottomRight - bottomLeft) * a;
+    const x2Bottom =
+      bottomLeft + (bottomRight - bottomLeft) * b;
+
+    // Sombra leve da tinta
+    ctx.fillStyle = `rgba(0,0,0,${0.18 * opacity})`;
+
+    ctx.beginPath();
+    ctx.moveTo(x1Top, topSlice.y + 2);
+    ctx.lineTo(x2Top, topSlice.y + 2);
+    ctx.lineTo(x2Bottom, bottomSlice.y + 2);
+    ctx.lineTo(x1Bottom, bottomSlice.y + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Faixa branca vertical da travessia
+    ctx.fillStyle = `rgba(248,250,252,${0.78 * opacity})`;
+
+    ctx.beginPath();
+    ctx.moveTo(x1Top, topSlice.y);
+    ctx.lineTo(x2Top, topSlice.y);
+    ctx.lineTo(x2Bottom, bottomSlice.y);
+    ctx.lineTo(x1Bottom, bottomSlice.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function getTrafficLightColor(frameCount) {
   return getTrafficLightState(frameCount).color;
 }
 
 function drawTrafficLightHead(ctx, activeColor) {
-  // Caixa do semáforo
   ctx.fillStyle = '#111827';
   ctx.fillRect(-9, -48, 18, 44);
 
@@ -266,7 +508,6 @@ function drawTrafficLightVisual(
 
   const scale = 0.42 + slice.t * 0.78;
 
-  // Semáforo do lado direito para manter a faixa esquerda livre
   const x =
     slice.right +
     24 +
@@ -282,26 +523,21 @@ function drawTrafficLightVisual(
   ctx.translate(x, y);
   ctx.scale(scale, scale);
 
-  // Sombra/base no chão
   ctx.fillStyle = 'rgba(0,0,0,0.28)';
   ctx.beginPath();
   ctx.ellipse(0, 8, 17, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Poste
   ctx.fillStyle = '#64748b';
   ctx.fillRect(-2, -58, 4, 68);
 
-  // Braço do semáforo
   ctx.fillRect(-2, -58, -24, 4);
 
-  // Caixa pendurada no braço
   ctx.save();
   ctx.translate(-27, -49);
   drawTrafficLightHead(ctx, activeColor);
   ctx.restore();
 
-  // Pequena placa traseira
   ctx.fillStyle = 'rgba(15,23,42,0.92)';
   ctx.fillRect(-5, -63, 8, 8);
 
@@ -341,7 +577,6 @@ function drawIntersectionVisual(
 
   ctx.save();
 
-  // Rua transversal mais sólida
   ctx.fillStyle = `rgba(13, 18, 30, ${0.96 * opacity})`;
 
   ctx.beginPath();
@@ -352,7 +587,6 @@ function drawIntersectionVisual(
   ctx.closePath();
   ctx.fill();
 
-  // Variação de asfalto no cruzamento
   const crossStreetShade = ctx.createLinearGradient(
     0,
     topY,
@@ -385,7 +619,6 @@ function drawIntersectionVisual(
   ctx.closePath();
   ctx.fill();
 
-  // Sombra no encontro da rua transversal com a avenida
   ctx.fillStyle = `rgba(0,0,0,${0.24 * opacity})`;
 
   ctx.beginPath();
@@ -396,7 +629,6 @@ function drawIntersectionVisual(
   ctx.closePath();
   ctx.fill();
 
-  // Bordas da rua transversal
   ctx.strokeStyle = `rgba(203,213,225,${0.38 * opacity})`;
   ctx.lineWidth = 2;
 
@@ -410,7 +642,6 @@ function drawIntersectionVisual(
   ctx.lineTo(CANVAS_WIDTH + 60, bottomY);
   ctx.stroke();
 
-  // Linha tracejada da rua transversal
   const midY = (topY + bottomY) / 2;
 
   ctx.strokeStyle = `rgba(226,232,240,${0.36 * opacity})`;
@@ -424,19 +655,37 @@ function drawIntersectionVisual(
 
   ctx.setLineDash([]);
 
-  // Linhas de parada na avenida principal
-  ctx.strokeStyle = `rgba(241,245,249,${0.58 * opacity})`;
-  ctx.lineWidth = 4;
+  drawCrosswalk(
+    ctx,
+    CANVAS_HEIGHT,
+    avenueState,
+    'near',
+    opacity * 0.88
+  );
 
-  ctx.beginPath();
-  ctx.moveTo(topSlice.left + 14, topY);
-  ctx.lineTo(topSlice.right - 14, topY);
-  ctx.stroke();
+  drawCrosswalk(
+    ctx,
+    CANVAS_HEIGHT,
+    avenueState,
+    'far',
+    opacity * 0.42
+  );
 
-  ctx.beginPath();
-  ctx.moveTo(bottomSlice.left + 14, bottomY);
-  ctx.lineTo(bottomSlice.right - 14, bottomY);
-  ctx.stroke();
+  drawStopLine(
+    ctx,
+    CANVAS_HEIGHT,
+    avenueState,
+    'near',
+    opacity
+  );
+
+  drawStopLine(
+    ctx,
+    CANVAS_HEIGHT,
+    avenueState,
+    'far',
+    opacity * 0.55
+  );
 
   ctx.restore();
 }
@@ -455,7 +704,6 @@ export function drawRoad(
     avenueState
   );
 
-  // Solo urbano escuro ao redor da pista
   const groundGradient = ctx.createLinearGradient(
     0,
     ROAD_HORIZON_Y,
@@ -474,11 +722,9 @@ export function drawRoad(
     CANVAS_HEIGHT - ROAD_HORIZON_Y
   );
 
-  // Asfalto principal
   ctx.fillStyle = '#171d2b';
   fillRoadShape(ctx, roadPoints);
 
-  // Leve sombra central do asfalto
   const asphaltShade = ctx.createLinearGradient(
     0,
     ROAD_HORIZON_Y,
@@ -492,7 +738,6 @@ export function drawRoad(
   ctx.fillStyle = asphaltShade;
   fillRoadShape(ctx, roadPoints);
 
-  // Textura estável do asfalto
   ctx.strokeStyle = 'rgba(255,255,255,0.025)';
   ctx.lineWidth = 1;
 
@@ -526,7 +771,6 @@ export function drawRoad(
     ctx.stroke();
   }
 
-  // Brilho discreto nas bordas
   ctx.strokeStyle = 'rgba(250, 204, 21, 0.25)';
   ctx.lineWidth = 8;
 
@@ -544,7 +788,6 @@ export function drawRoad(
     avenueState
   );
 
-  // Bordas externas amarelas
   ctx.strokeStyle = '#facc15';
   ctx.lineWidth = 4;
 
@@ -562,7 +805,6 @@ export function drawRoad(
     avenueState
   );
 
-  // Faixas internas
   ctx.strokeStyle = 'rgba(226,232,240,0.42)';
   ctx.lineWidth = 4;
 
@@ -600,7 +842,6 @@ export function drawRoad(
     });
   }
 
-  // Cruzamento visual simples
   drawIntersectionVisual(
     ctx,
     CANVAS_WIDTH,
@@ -608,7 +849,6 @@ export function drawRoad(
     avenueState
   );
 
-  // Semáforo visual, ainda sem lógica de parada
   drawTrafficLightVisual(
     ctx,
     s,

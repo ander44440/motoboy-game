@@ -52,7 +52,7 @@ const RESERVED_LEFT_LANE = 0;
 // 3 ficou legível, mas lento demais.
 // 4 era rápido demais para ler o semáforo.
 // 3.75 devolve energia sem perder controle.
-const GAME_SPEED = 6.75;
+const GAME_SPEED = 2.75;
 
 // A moto pode estar rápida, mas a cidade não precisa avançar
 // no mesmo ritmo. Isso evita cruzamentos passando rápido demais.
