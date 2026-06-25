@@ -51,8 +51,20 @@ const RESERVED_LEFT_LANE = 0;
 // Velocidade urbana ajustada.
 // 3 ficou legível, mas lento demais.
 // 4 era rápido demais para ler o semáforo.
-// 3.75 devolve energia sem perder controle.
+// 2.75 devolve energia sem perder controle.
+// Velocidade de cruzeiro aprovada.
 const GAME_SPEED = 2.75;
+
+// Controle manual da moto.
+// Sem apertar nada, a moto volta para a velocidade de cruzeiro.
+// W acelera acima do cruzeiro.
+// S freia até parar.
+const MIN_GAME_SPEED = 0;
+const MAX_GAME_SPEED = 3.75;
+const ACCELERATION_FORCE = 0.045;
+const BRAKE_FORCE = 0.095;
+const CRUISE_RETURN_FORCE = 0.025;
+const TRAFFIC_BASE_SPEED = GAME_SPEED * 0.92;
 
 // A moto pode estar rápida, mas a cidade não precisa avançar
 // no mesmo ritmo. Isso evita cruzamentos passando rápido demais.
@@ -76,9 +88,14 @@ export default function GameCanvas({
   motoColor,
 }) {
   const canvasRef = useRef(null);
-  const gameLoopRef = useRef(null);
-  const stateRef = useRef(null);
-  const touchStartRef = useRef(null);
+const gameLoopRef = useRef(null);
+const stateRef = useRef(null);
+const touchStartRef = useRef(null);
+
+const inputRef = useRef({
+  accelerate: false,
+  brake: false,
+});
 
   const getCurrentAvenueState = useCallback((s) => {
     const urbanDistance =
@@ -141,7 +158,7 @@ export default function GameCanvas({
 
   const getVehicleSpeedForTrafficLight = useCallback(
     (s, vehicle) => {
-      const baseVehicleSpeed = s.speed * 0.92;
+      const baseVehicleSpeed = TRAFFIC_BASE_SPEED;
 
       const trafficLightState =
         s.trafficLightState ||
@@ -260,14 +277,58 @@ export default function GameCanvas({
   );
 
   useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === 'ArrowLeft') handleInput('left');
-      else if (e.key === 'ArrowRight') handleInput('right');
-    };
+  const handleKeyDown = (e) => {
+    const key = e.key.toLowerCase();
 
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [handleInput]);
+    if (
+      key === 'arrowleft' ||
+      key === 'arrowright' ||
+      key === 'a' ||
+      key === 'd' ||
+      key === 'w' ||
+      key === 's'
+    ) {
+      e.preventDefault();
+      resumeAudioContext();
+    }
+
+    if ((key === 'arrowleft' || key === 'a') && !e.repeat) {
+      handleInput('left');
+    }
+
+    if ((key === 'arrowright' || key === 'd') && !e.repeat) {
+      handleInput('right');
+    }
+
+    if (key === 'w') {
+      inputRef.current.accelerate = true;
+    }
+
+    if (key === 's') {
+      inputRef.current.brake = true;
+    }
+  };
+
+  const handleKeyUp = (e) => {
+    const key = e.key.toLowerCase();
+
+    if (key === 'w') {
+      inputRef.current.accelerate = false;
+    }
+
+    if (key === 's') {
+      inputRef.current.brake = false;
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+  };
+}, [handleInput]);
 
   const handleTouchStart = useCallback((e) => {
     resumeAudioContext();
@@ -410,8 +471,32 @@ export default function GameCanvas({
       if (s.gameOver) return;
 
       s.frameCount++;
-      s.speed = GAME_SPEED;
-      s.urbanDistance += s.speed * URBAN_FLOW_MULTIPLIER;
+
+const input = inputRef.current;
+
+if (input.brake) {
+  s.speed = Math.max(
+    MIN_GAME_SPEED,
+    s.speed - BRAKE_FORCE
+  );
+} else if (input.accelerate) {
+  s.speed = Math.min(
+    MAX_GAME_SPEED,
+    s.speed + ACCELERATION_FORCE
+  );
+} else if (s.speed < GAME_SPEED) {
+  s.speed = Math.min(
+    GAME_SPEED,
+    s.speed + CRUISE_RETURN_FORCE
+  );
+} else if (s.speed > GAME_SPEED) {
+  s.speed = Math.max(
+    GAME_SPEED,
+    s.speed - CRUISE_RETURN_FORCE
+  );
+}
+
+s.urbanDistance += s.speed * URBAN_FLOW_MULTIPLIER;
       s.score = Math.floor(s.frameCount / 4);
       s.trafficLightState = getTrafficLightState(s.frameCount);
 

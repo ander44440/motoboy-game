@@ -280,11 +280,16 @@ export function drawScenery(
 
     const cycleSize = CANVAS_HEIGHT + 640;
 
-    const offset =
-      (
-        (s.frameCount * s.speed * velocity) +
-        i * 165
-      ) % cycleSize - 220;
+const sceneryTravel =
+  typeof s.urbanDistance === 'number'
+    ? s.urbanDistance * 1.9
+    : s.frameCount * s.speed;
+
+const offset =
+  (
+    sceneryTravel * velocity +
+    i * 165
+  ) % cycleSize - 220;
 
     const roadSlice = getRoadSlice(
   offset,
