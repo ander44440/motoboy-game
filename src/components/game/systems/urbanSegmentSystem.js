@@ -10,42 +10,22 @@ export const AVENUE_SEGMENT_TYPES = {
 const AVENUE_SEQUENCE = [
   {
     type: AVENUE_SEGMENT_TYPES.STRAIGHT,
-    length: 500,
-    curve: 0,
-  },
-  {
-    type: AVENUE_SEGMENT_TYPES.CURVE_RIGHT,
-    length: 850,
-    curve: 1,
-  },
-  {
-    type: AVENUE_SEGMENT_TYPES.STRAIGHT,
-    length: 520,
+    length: 200,
     curve: 0,
   },
   {
     type: AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH,
-    length: 430,
+    length: 70,
     curve: 0,
   },
   {
     type: AVENUE_SEGMENT_TYPES.INTERSECTION,
-    length: 420,
+    length: 65,
     curve: 0,
   },
   {
     type: AVENUE_SEGMENT_TYPES.INTERSECTION_EXIT,
-    length: 520,
-    curve: 0,
-  },
-  {
-    type: AVENUE_SEGMENT_TYPES.CURVE_LEFT,
-    length: 900,
-    curve: -1,
-  },
-  {
-    type: AVENUE_SEGMENT_TYPES.STRAIGHT,
-    length: 700,
+    length: 80,
     curve: 0,
   },
 ];
@@ -112,7 +92,7 @@ function getSegmentAtDistance(distance) {
 
 export function getAvenueSegmentState(distance) {
   const currentSegment = getSegmentAtDistance(distance);
-  const segmentAhead = getSegmentAtDistance(distance + 620);
+  const segmentAhead = getSegmentAtDistance(distance + 260);
 
   const isIntersectionNear =
     segmentAhead.type ===

@@ -108,50 +108,37 @@ function getIntersectionBand(avenueState, CANVAS_HEIGHT) {
   if (!avenueState) return null;
 
   const type = avenueState.type;
-  const progress = smoothStep(avenueState.progress || 0);
 
-  let centerRawY = null;
-  let opacity = 1;
+  const isIntersectionSegment =
+    type === AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH ||
+    type === AVENUE_SEGMENT_TYPES.INTERSECTION ||
+    type === AVENUE_SEGMENT_TYPES.INTERSECTION_EXIT;
 
-  if (
-    type === AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH
-  ) {
-    centerRawY =
-      ROAD_HORIZON_Y +
-      28 +
-      progress * 135;
+  if (!isIntersectionSegment) return null;
 
-    opacity = 0.5 + progress * 0.35;
+  let phase = 0;
+
+  if (type === AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH) {
+    phase = avenueState.progress * 0.34;
+  } else if (type === AVENUE_SEGMENT_TYPES.INTERSECTION) {
+    phase = 0.34 + avenueState.progress * 0.32;
+  } else {
+    phase = 0.66 + avenueState.progress * 0.34;
   }
 
-  if (type === AVENUE_SEGMENT_TYPES.INTERSECTION) {
-    centerRawY =
-      ROAD_HORIZON_Y +
-      155 +
-      progress * 250;
+  phase = smoothStep(phase);
 
-    opacity = 0.95;
-  }
-
-  if (
-    type === AVENUE_SEGMENT_TYPES.INTERSECTION_EXIT
-  ) {
-    centerRawY =
-      ROAD_HORIZON_Y +
-      410 +
-      progress * 260;
-
-    opacity = 0.95 * (1 - progress);
-  }
-
-  if (centerRawY === null) return null;
+  const centerRawY =
+  ROAD_HORIZON_Y +
+  44 +
+  phase * (CANVAS_HEIGHT - ROAD_HORIZON_Y + 150);
 
   const centerSlice = getRoadSlice(
     centerRawY,
     avenueState
   );
 
-  const bandSize = 54 + centerSlice.t * 140;
+  const bandSize = 26 + centerSlice.t * 46;
 
   const topRawY = Math.max(
     ROAD_HORIZON_Y,
@@ -165,6 +152,9 @@ function getIntersectionBand(avenueState, CANVAS_HEIGHT) {
 
   if (bottomRawY <= ROAD_HORIZON_Y) return null;
   if (topRawY >= CANVAS_HEIGHT) return null;
+
+  const opacity =
+    0.58 + (1 - Math.abs(phase - 0.5) * 2) * 0.22;
 
   return {
     topRawY,
@@ -195,7 +185,7 @@ function getStopLineInfo(
     avenueState
   );
 
-  const setback = 16 + referenceSlice.t * 30;
+  const setback = 10 + referenceSlice.t * 18;
 
   const rawY =
     side === 'near'
@@ -656,36 +646,20 @@ function drawIntersectionVisual(
   ctx.setLineDash([]);
 
   drawCrosswalk(
-    ctx,
-    CANVAS_HEIGHT,
-    avenueState,
-    'near',
-    opacity * 0.88
-  );
+  ctx,
+  CANVAS_HEIGHT,
+  avenueState,
+  'near',
+  opacity * 0.72
+);
 
-  drawCrosswalk(
-    ctx,
-    CANVAS_HEIGHT,
-    avenueState,
-    'far',
-    opacity * 0.42
-  );
-
-  drawStopLine(
-    ctx,
-    CANVAS_HEIGHT,
-    avenueState,
-    'near',
-    opacity
-  );
-
-  drawStopLine(
-    ctx,
-    CANVAS_HEIGHT,
-    avenueState,
-    'far',
-    opacity * 0.55
-  );
+drawStopLine(
+  ctx,
+  CANVAS_HEIGHT,
+  avenueState,
+  'near',
+  opacity * 0.82
+);
 
   ctx.restore();
 }

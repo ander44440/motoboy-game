@@ -4,7 +4,6 @@ import {
   CANVAS_HEIGHT,
 } from '../constants/gameConstants';
 
-import { getAvenueCurveFactorAtY } from './urbanSegmentSystem';
 
 // Horizonte da estrada rebaixado.
 // Antes: 152
@@ -41,21 +40,7 @@ export function getRoadCurveOffset(
   y,
   avenueState = null
 ) {
-  const t = getRoadRawT(y);
-
-  const curveStrength = 16;
-
-  const curveFactor = getAvenueCurveFactorAtY(
-    avenueState,
-    y
-  );
-
-  return (
-    curveFactor *
-    Math.sin(t * Math.PI) *
-    Math.pow(1 - t, 0.45) *
-    curveStrength
-  );
+  return 0;
 }
 
 export function getRoadSlice(

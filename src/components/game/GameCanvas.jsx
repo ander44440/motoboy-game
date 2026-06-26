@@ -68,7 +68,7 @@ const TRAFFIC_BASE_SPEED = GAME_SPEED * 0.92;
 
 // A moto pode estar rápida, mas a cidade não precisa avançar
 // no mesmo ritmo. Isso evita cruzamentos passando rápido demais.
-const URBAN_FLOW_MULTIPLIER = 0.52;
+const URBAN_FLOW_MULTIPLIER = 0.65;
 
 // Remove veículos logo antes de grudarem na base visual.
 const VEHICLE_DESPAWN_Y = CANVAS_HEIGHT - 8;
@@ -80,6 +80,8 @@ const COLLECTIBLE_DESPAWN_SCREEN_Y = CANVAS_HEIGHT - 35;
 // A fila só precisa existir antes/na região útil do jogo.
 // Depois disso, o objeto deve sair naturalmente.
 const QUEUE_CONTROL_LIMIT_Y = CANVAS_HEIGHT - 180;
+const RED_LIGHT_WARNING_DURATION = 36;
+const RED_LIGHT_MIN_SPEED_TO_WARN = 0.9;
 
 export default function GameCanvas({
   onScoreUpdate,
@@ -249,8 +251,10 @@ const inputRef = useRef({
       frameCount: 0,
       urbanDistance: 0,
       trafficLightState: getTrafficLightState(0),
-      gameOver: false,
-      buildings: generateBuildings(),
+redLightWarningUntil: 0,
+redLightViolationLock: false,
+gameOver: false,
+buildings: generateBuildings(),
 
       nextVehicleSpawnFrame: 42,
       lastVehicleLane: null,
@@ -350,6 +354,62 @@ const inputRef = useRef({
     [handleInput]
   );
 
+  const drawRedLightWarning = useCallback((ctx, s) => {
+  if (!s.redLightWarningUntil) return;
+  if (s.frameCount > s.redLightWarningUntil) return;
+
+  const remaining =
+    s.redLightWarningUntil - s.frameCount;
+
+  const fade = Math.max(
+    0,
+    Math.min(
+      1,
+      remaining / RED_LIGHT_WARNING_DURATION
+    )
+  );
+
+  const alpha = 0.22 + fade * 0.58;
+
+  ctx.save();
+
+  const boxWidth = 138;
+  const boxHeight = 28;
+  const x = CANVAS_WIDTH - boxWidth - 18;
+  const y = 68;
+
+  ctx.globalAlpha = alpha;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+  ctx.fillRect(x, y, boxWidth, boxHeight);
+
+  ctx.strokeStyle = 'rgba(248, 113, 113, 0.72)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, boxWidth, boxHeight);
+
+  ctx.fillStyle = '#fecaca';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.fillText(
+    'SINAL VERMELHO',
+    x + boxWidth / 2,
+    y + 11
+  );
+
+  ctx.font = '10px Arial';
+  ctx.fillStyle = 'rgba(254, 226, 226, 0.78)';
+
+  ctx.fillText(
+    'freie antes da faixa',
+    x + boxWidth / 2,
+    y + 22
+  );
+
+  ctx.restore();
+}, []);
+
   const drawGame = useCallback((ctx, s, color) => {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
@@ -419,8 +479,9 @@ const inputRef = useRef({
       if (entry.type === 'star') drawBonusStar(entry.item);
     });
 
-    drawPlayer(ctx, s.motoX, s.motoY, s.targetX, color || '#22c55e');
-  }, []);
+   drawPlayer(ctx, s.motoX, s.motoY, s.targetX, color || '#22c55e');
+
+  }, [drawRedLightWarning]);
 
   useEffect(() => {
     if (gameState !== 'playing') return;
@@ -497,10 +558,43 @@ if (input.brake) {
 }
 
 s.urbanDistance += s.speed * URBAN_FLOW_MULTIPLIER;
-      s.score = Math.floor(s.frameCount / 4);
-      s.trafficLightState = getTrafficLightState(s.frameCount);
+s.score = Math.floor(s.frameCount / 4);
+s.trafficLightState = getTrafficLightState(s.frameCount);
 
-      s.motoX += (s.targetX - s.motoX) * 0.15;
+const avenueState = getCurrentAvenueState(s);
+const isRedLightZone =
+  avenueState &&
+  (
+    (
+      avenueState.type === AVENUE_SEGMENT_TYPES.INTERSECTION_APPROACH &&
+      avenueState.progress > 0.68
+    ) ||
+    (
+      avenueState.type === AVENUE_SEGMENT_TYPES.INTERSECTION &&
+      avenueState.progress < 0.42
+    )
+  );
+
+if (
+  s.trafficLightState.shouldStop &&
+  isRedLightZone &&
+  s.speed > RED_LIGHT_MIN_SPEED_TO_WARN &&
+  !s.redLightViolationLock
+) {
+  s.redLightWarningUntil =
+    s.frameCount + RED_LIGHT_WARNING_DURATION;
+
+  s.redLightViolationLock = true;
+}
+
+if (
+  !s.trafficLightState.shouldStop ||
+  !isTrafficLightZoneActive(avenueState)
+) {
+  s.redLightViolationLock = false;
+}
+
+s.motoX += (s.targetX - s.motoX) * 0.15;
 
       s.roadLines = s.roadLines.map((y) => {
         y += s.speed * 1.5;
