@@ -163,7 +163,7 @@ function getIntersectionBand(avenueState, CANVAS_HEIGHT) {
   };
 }
 
-function getStopLineInfo(
+export function getStopLineInfo(
   avenueState,
   CANVAS_HEIGHT,
   side = 'near'
