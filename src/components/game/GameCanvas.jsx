@@ -85,6 +85,18 @@ const FORWARD_TRAFFIC_CHECK_INTERVAL = 20;
 const FORWARD_TRAFFIC_HORIZON_SCREEN_Y = VEHICLE_DESPAWN_SCREEN_Y + 8;
 const FORWARD_TRAFFIC_HORIZON_GAP = 85;
 
+// Ciclo de vida dos carros em relação à moto.
+// O carro só pode ser removido por ultrapassagem depois de
+// ter ficado claramente à frente da moto.
+const VEHICLE_AHEAD_OF_MOTO_MARGIN = 75;
+const VEHICLE_OVERTAKEN_DESPAWN_MARGIN = 72;
+
+// Se um carro nasceu na base, ainda está atrás da moto,
+// e a moto está rápida demais para ele alcançar,
+// ele sai da cena para não acumular/acompanhá-la na base.
+const VEHICLE_BASE_ACCEL_DESPAWN_MARGIN = 105;
+const VEHICLE_BASE_ACCEL_DESPAWN_MIN_AGE = 10;
+
 // Coletáveis usam projeção. Por isso a remoção precisa olhar
 // o Y visual projetado, não apenas o Y lógico.
 const COLLECTIBLE_DESPAWN_SCREEN_Y = CANVAS_HEIGHT - 35;
@@ -567,7 +579,7 @@ export default function GameCanvas({
       return vehicleModels[index];
     };
 
-    const spawnForwardTrafficIfNeeded = () => {
+     const spawnForwardTrafficIfNeeded = () => {
   if (s.frameCount % FORWARD_TRAFFIC_CHECK_INTERVAL !== 0) return;
 
   const screenY = FORWARD_TRAFFIC_HORIZON_SCREEN_Y;
@@ -583,26 +595,12 @@ export default function GameCanvas({
 
       const projected = projectRoadPoint(o.lane, o.y);
 
-// Marca quando o carro já ficou realmente à frente da moto.
-// Não remove carro que acabou de nascer na base.
-if (projected.y < s.motoY - 75) {
-  o.hasBeenAheadOfMoto = true;
-}
-
-// Se o carro já esteve à frente e depois voltou para trás,
-// significa que a moto o ultrapassou. Ele deve sair da cena.
-const wasOvertakenByMoto =
-  o.hasBeenAheadOfMoto &&
-  projected.y > s.motoY + 65;
-
-if (wasOvertakenByMoto) {
-  return false;
-}
-
-return (
-  projected.y > VEHICLE_DESPAWN_SCREEN_Y &&
-  o.y < VEHICLE_BOTTOM_DESPAWN_Y
-);
+      // Bloqueia apenas o espaço natural do horizonte.
+      // A remoção de carros ultrapassados acontece no filter principal.
+      return (
+        projected.y > VEHICLE_DESPAWN_SCREEN_Y &&
+        projected.y < screenY + FORWARD_TRAFFIC_HORIZON_GAP
+      );
     });
 
     if (!blocked) {
@@ -618,17 +616,20 @@ return (
     ];
 
   s.obstacles.push({
-    x: getLaneX(lane),
-    y: getRoadSourceYForScreenY(screenY),
-    lane,
-    direction: 'away',
-    type: 'car',
-    vehicleModel: chooseVehicleModel(),
-    color: chooseVehicleColor(),
-  });
+  x: getLaneX(lane),
+  y: getRoadSourceYForScreenY(screenY),
+  lane,
+  direction: 'away',
+  type: 'car',
+  vehicleModel: chooseVehicleModel(),
+  color: chooseVehicleColor(),
+  spawnSource: 'horizon',
+  hasBeenAheadOfMoto: true,
+  spawnFrame: s.frameCount,
+});
 
   s.vehicleSpawnCount++;
-};
+    };
     
 
     const loop = () => {
@@ -745,14 +746,17 @@ return (
           const direction = 'away';
 
           s.obstacles.push({
-            x: getLaneX(lane),
-            y: VEHICLE_SPAWN_Y,
-            lane,
-            direction,
-            type: 'car',
-            vehicleModel: chooseVehicleModel(),
-            color: chooseVehicleColor(),
-          });
+  x: getLaneX(lane),
+  y: VEHICLE_SPAWN_Y,
+  lane,
+  direction,
+  type: 'car',
+  vehicleModel: chooseVehicleModel(),
+  color: chooseVehicleColor(),
+  spawnSource: 'base',
+  hasBeenAheadOfMoto: false,
+  spawnFrame: s.frameCount,
+});
 
           s.lastVehicleLane = lane;
           s.vehicleSpawnCount++;
@@ -803,6 +807,10 @@ return (
       }
 
       s.obstacles = s.obstacles.filter((o) => {
+  if (o.type === 'car' && typeof o.spawnFrame !== 'number') {
+    o.spawnFrame = s.frameCount;
+  }
+
   let vehicleSpeed =
     o.type === 'car'
       ? getVehicleSpeedForTrafficLight(s, o)
@@ -847,18 +855,53 @@ return (
     }
   }
 
+  const relativeVehicleSpeed =
+    vehicleSpeed - s.speed * VEHICLE_MOTO_INFLUENCE;
+
   if (!lockedAtRedLight) {
     // Movimento relativo normal:
     // moto parada -> carro sobe;
     // moto acelerando -> carro sobe mais devagar;
     // moto muito rápida -> carro pode parecer descer.
-    const relativeVehicleSpeed =
-      vehicleSpeed - s.speed * VEHICLE_MOTO_INFLUENCE;
-
     o.y -= relativeVehicleSpeed;
   }
 
   const projected = projectRoadPoint(o.lane, o.y);
+
+  if (o.type === 'car') {
+    const vehicleAge = s.frameCount - o.spawnFrame;
+
+    // 1) Primeiro o carro precisa ter passado claramente pela moto
+    // e ficado à frente na tela.
+    if (projected.y < s.motoY - VEHICLE_AHEAD_OF_MOTO_MARGIN) {
+      o.hasBeenAheadOfMoto = true;
+    }
+
+    // 2) Se depois disso ele voltou para baixo da moto,
+    // significa que a moto já o ultrapassou totalmente.
+    const wasOvertakenByMoto =
+      o.hasBeenAheadOfMoto &&
+      projected.y > s.motoY + VEHICLE_OVERTAKEN_DESPAWN_MARGIN;
+
+    if (wasOvertakenByMoto) {
+      return false;
+    }
+
+    // 3) Caso especial:
+    // carro que nasceu na base, ainda não conseguiu ficar à frente,
+    // e a moto está mais rápida que ele. Esse carro deve sumir atrás
+    // da moto em vez de ficar acompanhando/acumulando na base.
+    const baseCarFellBehindMoto =
+      o.spawnSource === 'base' &&
+      !o.hasBeenAheadOfMoto &&
+      vehicleAge > VEHICLE_BASE_ACCEL_DESPAWN_MIN_AGE &&
+      relativeVehicleSpeed <= 0 &&
+      projected.y > s.motoY + VEHICLE_BASE_ACCEL_DESPAWN_MARGIN;
+
+    if (baseCarFellBehindMoto) {
+      return false;
+    }
+  }
 
   return (
     projected.y > VEHICLE_DESPAWN_SCREEN_Y &&
