@@ -235,6 +235,127 @@ function drawBusStop(ctx) {
   ctx.fillRect(-16, -2, 32, 5);
 }
 
+function drawSideFacade(ctx, side, index) {
+  const isLeft = side === 'left';
+
+  // Prédios laterais maiores, não objetos pequenos.
+  const width = 72 + (index % 3) * 18;
+  const height = 150 + (index % 4) * 34;
+
+  const x = isLeft ? -width : 0;
+
+  // O prédio nasce da calçada e cresce para cima.
+  const y = -height;
+
+  const colors = [
+    '#0f172a',
+    '#111827',
+    '#172033',
+    '#1e293b',
+  ];
+
+  ctx.fillStyle = colors[index % colors.length];
+  ctx.fillRect(x, y, width, height);
+
+  // Sombra lateral para dar volume.
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+
+  if (isLeft) {
+    ctx.fillRect(x + width - 12, y, 12, height);
+  } else {
+    ctx.fillRect(x, y, 12, height);
+  }
+
+  // Térreo escuro, como comércio fechado/garagem.
+  ctx.fillStyle = '#070d18';
+  ctx.fillRect(x + 8, -26, width - 16, 26);
+
+  ctx.fillStyle = 'rgba(253, 230, 138, 0.16)';
+  ctx.fillRect(x + 14, -18, width - 28, 4);
+
+  // Janelas discretas.
+  const cols = Math.max(2, Math.floor(width / 18));
+  const rows = Math.max(3, Math.floor((height - 42) / 22));
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const shouldLight =
+        (row * 2 + col + index) % 5 === 0;
+
+      ctx.fillStyle = shouldLight
+        ? 'rgba(253, 230, 138, 0.24)'
+        : 'rgba(148, 163, 184, 0.10)';
+
+      ctx.fillRect(
+        x + 12 + col * 18,
+        y + 14 + row * 22,
+        6,
+        9
+      );
+    }
+  }
+
+  // Topo do prédio.
+  ctx.fillStyle = '#060b14';
+  ctx.fillRect(x - 3, y - 6, width + 6, 6);
+}
+
+function drawSideFacades(
+  ctx,
+  s,
+  CANVAS_HEIGHT
+   ) 
+   {
+      const cycleSize = CANVAS_HEIGHT + 760;
+
+     const sceneryTravel =
+      typeof s.urbanDistance === 'number'
+      ? s.urbanDistance * 1.45
+      : s.frameCount * s.speed;
+
+      for (let i = 0; i < 10; i++) {
+    const isLeftSide = i % 2 === 0;
+
+    const offset =
+      (
+        sceneryTravel +
+        i * 185
+      ) % cycleSize - 260;
+
+    const roadSlice = getRoadSlice(
+      offset,
+      s.avenueState
+    );
+
+    if (roadSlice.y < 150) continue;
+    if (roadSlice.y > CANVAS_HEIGHT + 90) continue;
+
+    const sidewalkWidth = getSidewalkWidth(
+      roadSlice.t
+    );
+
+        const facadeOffset =
+      sidewalkWidth * 1.85 + 18;
+
+    const objX = isLeftSide
+      ? roadSlice.left - facadeOffset
+      : roadSlice.right + facadeOffset;
+
+    ctx.save();
+
+        ctx.translate(objX, roadSlice.y + 18);
+    ctx.scale(roadSlice.scale, roadSlice.scale);
+
+    drawSideFacade(
+      ctx,
+      isLeftSide ? 'left' : 'right',
+      i
+    );
+
+    ctx.restore();
+  }
+}
+
 function drawSideObject(ctx, type, index) {
   if (type === 0) {
     drawStreetLight(ctx);
@@ -260,10 +381,17 @@ export function drawScenery(
   projectRoadPoint,
   CANVAS_HEIGHT
 ) {
-  drawUrbanSidewalks(
+    drawUrbanSidewalks(
     ctx,
     CANVAS_HEIGHT,
     s.avenueState
+  );
+
+  // Fachadas e prédios baixos atrás dos objetos laterais.
+  drawSideFacades(
+    ctx,
+    s,
+    CANVAS_HEIGHT
   );
 
   // Objetos urbanos laterais

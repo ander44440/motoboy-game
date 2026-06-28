@@ -10,14 +10,14 @@ import {
 // Agora: 176
 // Objetivo: dar sensação de câmera mais alta,
 // como se víssemos a avenida de cima.
-export const ROAD_HORIZON_Y = 186;
+export const ROAD_HORIZON_Y = 236;
 
 const ROAD_BOTTOM_LEFT = 40;
 const ROAD_BOTTOM_RIGHT = CANVAS_WIDTH - 40;
 
 // Ponto de fuga estreito: avenida longa/infinita
-const ROAD_TOP_LEFT = CANVAS_WIDTH * 0.462;
-const ROAD_TOP_RIGHT = CANVAS_WIDTH * 0.538;
+const ROAD_TOP_LEFT = CANVAS_WIDTH * 0.46;
+const ROAD_TOP_RIGHT = CANVAS_WIDTH * 0.53;
 
 export function getRoadRawT(y) {
   return Math.max(
@@ -33,7 +33,7 @@ export function getRoadRawT(y) {
 export function getRoadPerspective(y) {
   const t = getRoadRawT(y);
 
-  return Math.pow(t, 2.2);
+  return Math.pow(t, 1.85);
 }
 
 export function getRoadCurveOffset(
@@ -144,7 +144,7 @@ export function getRoadSourceYForScreenY(screenY) {
 
   const rawT = Math.pow(
     normalized,
-    1 / 2.2
+    1 / 1.85
   );
 
   return (
